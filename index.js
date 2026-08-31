@@ -2,7 +2,7 @@ import { ContentAddonRuntime } from './src/runtime.js';
 import { SettingsUI } from './src/settings-ui.js';
 import { StoryStudioPhoneApp, openStoryStudioApp } from './src/phone-studio-app.js';
 
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 
 let runtime = null;
 let settingsUI = null;

@@ -25,11 +25,14 @@ test('investigation template uses the original dossier modules instead of the ge
   const pack = validateImportPack(JSON.parse(await readFile(packUrl, 'utf8')));
   const investigation = pack.items.find((item) => item.id === 'yssa_investigation_report');
   assert.ok(investigation);
-  for (const key of ['bodyData', 'orientation', 'purityDetails', 'partners', 'fertilityHistory', 'oralDevelopment', 'firstExperience', 'voiceProfile']) {
+  for (const key of ['meta', 'portrait', 'psychology', 'purity', 'sexualStats', 'fertility', 'development', 'masturbation', 'experiences', 'appeal']) {
     assert.ok(Object.hasOwn(investigation.initialState, key), `missing ${key}`);
   }
-  assert.match(investigation.promptTemplate, /基础档案/);
-  assert.match(investigation.promptTemplate, /综合魅力评估/);
+  assert.ok(Object.hasOwn(investigation.initialState.appeal, 'voice'));
+  assert.ok(Object.hasOwn(investigation.initialState.development, 'genital'));
+  assert.match(investigation.promptTemplate, /V3\.647/);
+  assert.match(investigation.promptTemplate, /使人怀孕次数/);
+  assert.match(investigation.promptTemplate, /rumors 至少6项/);
   assert.doesNotMatch(investigation.promptTemplate, /下一步调查或互动建议/);
 });
 

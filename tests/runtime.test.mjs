@@ -61,7 +61,7 @@ test('installs the pack and syncs memory without prompts or AI calls', async (t)
   await runtime.start();
   assert.equal(mofo.getItems().length, 5);
   assert.equal(mofo.getItemById('yssa_memory_snapshot').state.summary, '测试总结');
-  assert.equal(context.extensionSettings[EXTENSION_KEY].packRevision, 2);
+  assert.equal(context.extensionSettings[EXTENSION_KEY].packRevision, 3);
   assert.equal(promptCalls, 0);
   assert.equal(aiCalls, 0);
   runtime.stop();
@@ -103,7 +103,7 @@ test('does not recreate user-deleted templates after the content revision was in
   const runtime = new ContentAddonRuntime();
   await runtime.start();
   assert.equal(mofo.getItems().length, 0);
-  assert.equal(context.extensionSettings[EXTENSION_KEY].packRevision, 2);
+  assert.equal(context.extensionSettings[EXTENSION_KEY].packRevision, 3);
   runtime.stop();
 });
 
@@ -141,7 +141,7 @@ test('persists, uses and resets editable prompt overrides', async (t) => {
   const runtime = new ContentAddonRuntime();
   await runtime.start();
   const defaultPrompt = runtime.getPrompt('yssa_investigation_report');
-  assert.match(defaultPrompt, /纯洁档案/);
+  assert.match(defaultPrompt, /V3\.647/);
   runtime.savePrompt('yssa_investigation_report', '我的自定义调查提示词');
   assert.equal(runtime.getPrompt('yssa_investigation_report'), '我的自定义调查提示词');
   assert.equal(runtime.isPromptCustomized('yssa_investigation_report'), true);

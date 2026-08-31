@@ -12,7 +12,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   promptOverrides: {},
 });
 
-const CONTENT_REVISION = 2;
+const CONTENT_REVISION = 3;
 const RETRY_DELAYS = Object.freeze([800, 1800, 4000, 9000, 18000, 30000]);
 
 function clone(value) {
@@ -123,6 +123,14 @@ export class ContentAddonRuntime {
 
   generateTool(toolId, options = {}) {
     return this.generation.generate(toolId, options);
+  }
+
+  updateToolState(toolId, state, source = 'yuzuki-story-studio') {
+    const mofoData = resolveMofoData(globalThis);
+    if (!mofoData) throw new Error('魔坊数据层尚未就绪。');
+    const updated = updateItemState(mofoData, toolId, state, source);
+    if (!updated) throw new Error('写入当前聊天失败。');
+    return updated;
   }
 
   cancelGeneration() {
@@ -278,8 +286,8 @@ export class ContentAddonRuntime {
       const result = previousRevision === 0 || manualInstall
         ? installMissingItems(mofoData, pack)
         : { installed: [], existing: [], conflicts: [] };
-      const upgraded = previousRevision < 2
-        ? upgradeManagedItems(mofoData, pack, ['yssa_investigation_report'])
+      const upgraded = previousRevision < CONTENT_REVISION
+        ? upgradeManagedItems(mofoData, pack, GENERATION_TOOLS.map((tool) => tool.id))
         : [];
       this.settings.packRevision = CONTENT_REVISION;
       this.context.saveSettingsDebounced?.();
@@ -293,7 +301,7 @@ export class ContentAddonRuntime {
         message: result.conflicts.length
           ? `已连接魔坊，但有 ${result.conflicts.length} 个同名模板未自动覆盖。`
           : (upgraded.length
-              ? '角色大调查已升级为原版完整档案结构。'
+              ? '剧情工坊已升级为完整 App 页面与结构化内容。'
               : (result.installed.length ? `已安装 ${result.installed.length} 个缺失模板。` : '魔坊内容模板已就绪。')),
       });
       if (this.settings.memorySync) await this.refreshMemoryNow(reason, mofoData);

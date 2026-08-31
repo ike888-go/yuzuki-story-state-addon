@@ -7,9 +7,9 @@ export const GENERATION_TOOLS = Object.freeze([
     name: '剧情状态',
     icon: '◈',
     eyebrow: 'STORY NOW',
-    description: '整理时间、地点、在场角色、目标、关系气氛与下一步。',
+    description: '像原状态栏一样查看场景、人物关系、线索、玩法与灵感商店。',
     temperature: 0.35,
-    maxTokens: 1800,
+    maxTokens: 4200,
   },
   {
     id: 'yssa_investigation_report',
@@ -17,7 +17,7 @@ export const GENERATION_TOOLS = Object.freeze([
     name: '角色大调查',
     icon: '⌕',
     eyebrow: 'PRIVATE DOSSIER',
-    description: '按原版结构生成角色的完整私密档案，可附加要求或接续当前档案。',
+    description: '按色色灵感状态栏原版结构生成完整私密档案。',
     needsTarget: true,
     temperature: 0.45,
     maxTokens: 8000,
@@ -28,19 +28,19 @@ export const GENERATION_TOOLS = Object.freeze([
     name: '剧情成就',
     icon: '✦',
     eyebrow: 'ACHIEVEMENTS',
-    description: '回顾已经发生的剧情，只记录真正达成的成就。',
+    description: '以卡册方式回顾已解锁、隐藏与进行中的剧情成就。',
     temperature: 0.5,
-    maxTokens: 2000,
+    maxTokens: 3200,
   },
   {
     id: 'yssa_social_notes',
     key: 'social',
-    name: '社交笔记',
+    name: '小红书',
     icon: '♡',
     eyebrow: 'SOCIAL NOTES',
-    description: '把近期剧情转成角色视角的三条生活分享。',
+    description: '双列信息流、笔记详情、评论与角色主页。',
     temperature: 0.72,
-    maxTokens: 2400,
+    maxTokens: 5200,
   },
 ]);
 
@@ -114,20 +114,38 @@ export function normalizeGeneratedState(parsed, initialState = {}, currentState 
   const matchedKeys = allowedKeys.filter((key) => Object.prototype.hasOwnProperty.call(parsed, key));
   if (matchedKeys.length === 0) throw new Error('生成结果没有包含模板所需字段。');
 
+  const normalizeValue = (value, schemaValue, fallback) => {
+    if (Array.isArray(schemaValue)) {
+      return Array.isArray(value) ? clone(value) : (Array.isArray(fallback) ? clone(fallback) : []);
+    }
+    if (isPlainObject(schemaValue)) {
+      if (!Object.keys(schemaValue).length) {
+        return isPlainObject(value) ? clone(value) : (isPlainObject(fallback) ? clone(fallback) : {});
+      }
+      const source = isPlainObject(value) ? value : {};
+      const previous = isPlainObject(fallback) ? fallback : {};
+      return Object.fromEntries(Object.keys(schemaValue).map((childKey) => [
+        childKey,
+        normalizeValue(
+          Object.prototype.hasOwnProperty.call(source, childKey) ? source[childKey] : previous[childKey],
+          schemaValue[childKey],
+          previous[childKey] ?? schemaValue[childKey],
+        ),
+      ]));
+    }
+    if (typeof schemaValue === 'number') {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : Number(fallback) || 0;
+    }
+    if (typeof schemaValue === 'boolean') return value === true || value === 'true' || value === 1;
+    return text(value ?? fallback, 24000);
+  };
+
   const output = {};
   for (const key of allowedKeys) {
     const fallback = Object.prototype.hasOwnProperty.call(current, key) ? current[key] : schema[key];
     const value = Object.prototype.hasOwnProperty.call(parsed, key) ? parsed[key] : fallback;
-    if (typeof schema[key] === 'number') {
-      const numeric = Number(value);
-      output[key] = Number.isFinite(numeric) ? numeric : Number(fallback) || 0;
-    } else if (typeof schema[key] === 'boolean') {
-      output[key] = value === true || value === 'true' || value === 1;
-    } else if (isPlainObject(value) || Array.isArray(value)) {
-      output[key] = JSON.stringify(value);
-    } else {
-      output[key] = text(value, 12000);
-    }
+    output[key] = normalizeValue(value, schema[key], fallback);
   }
   return output;
 }
@@ -210,10 +228,11 @@ export function buildGenerationMessages({
     {
       role: 'system',
       content: [
-        '你是柚月剧情工坊的数据整理助手。',
+        '你是柚月剧情工坊的数据整理与应用内容生成助手。',
         '只依据给出的角色设定、记忆和最近剧情工作；未知内容必须明确写未知，不得伪造事实。',
         '最终只返回一个 JSON 对象，不要 Markdown、代码围栏、解释、标签或额外文字。',
-        `允许的字段以这个对象为准：${schema}`,
+        '数组必须保持为数组，对象必须保持为对象，不得把结构化内容改写成带换行的长字符串。',
+        `允许的完整数据结构以这个对象为准：${schema}`,
       ].join('\n'),
     },
     {

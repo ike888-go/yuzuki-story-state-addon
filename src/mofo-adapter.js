@@ -58,17 +58,10 @@ export function upgradeManagedItems(mofoData, pack, itemIds = []) {
     const current = mofoData.getItemById?.(itemId)
       || mofoData.getItems().find((item) => String(item?.id || '') === String(itemId));
     if (!definition || !current) continue;
-    const nextState = Object.hasOwn(current.state || {}, 'orientation')
-      && Object.hasOwn(current.state || {}, 'bodyData')
-      ? current.state
-      : {
-          ...clone(definition.initialState || {}),
-          target: current.state?.target || definition.initialState?.target || '',
-          userNote: current.state?.profile
-            ? `旧版档案摘要：${String(current.state.profile).slice(0, 800)}`
-            : definition.initialState?.userNote || '',
-          _legacyState: clone(current.state || {}),
-        };
+    // Definitions may change substantially between addon releases. Keep the
+    // user's current state byte-for-byte compatible; the app view owns legacy
+    // normalization and the next successful generation writes the new shape.
+    const nextState = clone(current.state || definition.initialState || {});
     const updated = mofoData.updateItem(itemId, {
       ...clone(definition),
       state: clone(nextState),

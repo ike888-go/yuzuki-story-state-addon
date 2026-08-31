@@ -25,6 +25,18 @@ test('normalizes output to the template schema and preserves missing fields', ()
   assert.deepEqual(result, { total: 4, latest: '初见', progress: '继续调查' });
 });
 
+test('preserves structured app arrays and nested objects instead of flattening them to text', () => {
+  const result = normalizeGeneratedState(
+    { scene: { title: '雨夜' }, posts: [{ id: 'p1', title: '一场雨' }] },
+    { scene: { title: '', location: '' }, posts: [] },
+    { scene: { title: '旧章', location: '车站' }, posts: [] },
+  );
+  assert.deepEqual(result, {
+    scene: { title: '雨夜', location: '车站' },
+    posts: [{ id: 'p1', title: '一场雨' }],
+  });
+});
+
 test('builds bounded roleplay context without requesting a normal chat turn', () => {
   const item = {
     id: 'yssa_investigation_report',

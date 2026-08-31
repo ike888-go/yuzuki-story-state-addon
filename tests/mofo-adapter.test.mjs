@@ -51,7 +51,7 @@ test('updates only the current-session runtime state of one item', () => {
   assert.equal(item.lastUpdatedBy, 'read-only-test');
 });
 
-test('upgrades only the explicitly managed investigation item and keeps a legacy backup', () => {
+test('upgrades only the explicitly managed item and preserves its legacy state in place', () => {
   const mofo = fakeMofo([
     { id: 'yssa_investigation_report', name: '角色大调查', state: { target: '林姐', profile: '旧人物侧写' } },
     { id: 'user-item', name: '用户页面', htmlTemplate: '不要修改', state: { value: 1 } },
@@ -68,6 +68,6 @@ test('upgrades only the explicitly managed investigation item and keeps a legacy
   const investigation = mofo.getItemById('yssa_investigation_report');
   assert.equal(investigation.htmlTemplate, '<section>{{orientation}}</section>');
   assert.equal(investigation.state.target, '林姐');
-  assert.equal(investigation.state._legacyState.profile, '旧人物侧写');
+  assert.equal(investigation.state.profile, '旧人物侧写');
   assert.equal(mofo.getItemById('user-item').htmlTemplate, '不要修改');
 });
