@@ -9,8 +9,9 @@ function addTextElement(parent, tag, className, content) {
 }
 
 export class SettingsUI {
-  constructor(runtime) {
+  constructor(runtime, openPhoneApp = () => {}) {
     this.runtime = runtime;
+    this.openPhoneApp = openPhoneApp;
     this.root = null;
     this.statusNode = null;
     this.retryTimer = null;
@@ -47,7 +48,7 @@ export class SettingsUI {
     root.setAttribute('aria-labelledby', 'yssa-addon-title');
     const heading = addTextElement(root, 'h3', '', '柚月魔坊内容增量包');
     heading.id = 'yssa-addon-title';
-    addTextElement(root, 'p', 'yssa-settings__summary', '只向魔坊安装内容模板，并只读显示柚月记忆；不会创建独立 App、写数据库、启用 MVU 或自动调用 AI。');
+    addTextElement(root, 'p', 'yssa-settings__summary', '向柚月手机添加“剧情工坊”完整 App；只有手动点击生成时才调用 AI，不写数据库，也不启用 MVU。');
     this.statusNode = addTextElement(root, 'p', 'yssa-settings__status', '正在检测依赖…');
     this.statusNode.dataset.yssaStatus = '';
     this.statusNode.setAttribute('aria-live', 'polite');
@@ -57,6 +58,9 @@ export class SettingsUI {
     const install = addTextElement(actions, 'button', 'menu_button', '安装缺失模板');
     install.type = 'button';
     install.addEventListener('click', () => this.runAction(() => this.runtime.installMissing('settings')), { signal: this.abortController.signal });
+    const open = addTextElement(actions, 'button', 'menu_button', '打开剧情工坊');
+    open.type = 'button';
+    open.addEventListener('click', () => this.openPhoneApp(), { signal: this.abortController.signal });
     const refresh = addTextElement(actions, 'button', 'menu_button', '刷新记忆快照');
     refresh.type = 'button';
     refresh.addEventListener('click', () => this.runAction(() => this.runtime.refreshMemory('settings')), { signal: this.abortController.signal });

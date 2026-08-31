@@ -20,6 +20,20 @@
       "fallback": null
     },
     {
+      "id": "yuzuki-phone-page-shell",
+      "owner": "provider",
+      "symbol": "window.VirtualPhone.home.phoneShell.setContent",
+      "required": true,
+      "fallback": null
+    },
+    {
+      "id": "yuzuki-phone-ai",
+      "owner": "provider",
+      "symbol": "window.VirtualPhone.apiManager.callAI",
+      "required": true,
+      "fallback": null
+    },
+    {
       "id": "yuzuki-phone-mofo-data",
       "owner": "provider",
       "symbol": "window.VirtualPhone.cachedMofoData",

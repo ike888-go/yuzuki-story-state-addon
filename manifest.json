@@ -1,9 +1,9 @@
 {
   "display_name": "柚月魔坊内容增量包",
   "name": "yuzuki-story-state-addon",
-  "description": "为柚月手机魔坊补充状态、记忆、大调查、成就和社交笔记模板；只读同步柚月记忆，不使用数据库或 MVU。",
+  "description": "为柚月手机添加独立剧情工坊 App，手动生成状态、大调查、成就和社交笔记，并只读同步柚月记忆；不使用数据库或 MVU。",
   "author": "keke / Codex",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "loading_order": 260,
   "minimum_client_version": "1.18.0",
   "js": "index.js",

@@ -11,6 +11,8 @@
   "symbols": [
     "SillyTavern.getContext",
     "window.VirtualPhone",
+    "window.VirtualPhone.home.phoneShell.setContent",
+    "window.VirtualPhone.apiManager.callAI",
     "window.VirtualPhone.cachedMofoData",
     "window.VirtualPhone.mofoApp.mofoData",
     "window.YuzukiMemory",

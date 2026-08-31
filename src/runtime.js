@@ -1,6 +1,7 @@
 import { readMemorySnapshot, hasMemoryRuntime } from './memory-adapter.js';
 import { installMissingItems, resolveMofoData, updateItemState } from './mofo-adapter.js';
 import { clonePack, loadImportPack, MEMORY_ITEM_ID } from './pack-registry.js';
+import { GenerationService, GENERATION_TOOLS } from './generation-service.js';
 
 export const EXTENSION_KEY = 'yuzuki_story_state_addon';
 
@@ -30,6 +31,7 @@ export class ContentAddonRuntime {
     this.pendingTimers = new Set();
     this.retryIndex = 0;
     this.syncChain = Promise.resolve();
+    this.generation = new GenerationService(() => this.getContext());
     this.status = {
       active: false,
       phoneReady: false,
@@ -60,6 +62,26 @@ export class ContentAddonRuntime {
 
   getStatus() {
     return clone(this.status);
+  }
+
+  getGenerationTools() {
+    return GENERATION_TOOLS.map((tool) => ({ ...tool }));
+  }
+
+  getGenerationItem(toolId) {
+    return this.generation.getItem(toolId);
+  }
+
+  getSuggestedTargets() {
+    return this.generation.getSuggestedTargets();
+  }
+
+  generateTool(toolId, options = {}) {
+    return this.generation.generate(toolId, options);
+  }
+
+  cancelGeneration() {
+    this.generation.cancel();
   }
 
   setStatus(patch) {
@@ -128,6 +150,7 @@ export class ContentAddonRuntime {
 
   stop() {
     if (!this.active) return;
+    this.cancelGeneration();
     for (const [event, handler] of this.listeners) {
       if (typeof this.context?.eventSource?.off === 'function') this.context.eventSource.off(event, handler);
       else this.context?.eventSource?.removeListener?.(event, handler);
