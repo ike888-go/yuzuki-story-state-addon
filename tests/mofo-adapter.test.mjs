@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { installMissingItems, updateItemState } from '../src/mofo-adapter.js';
+import { installMissingItems, updateItemState, upgradeManagedItems } from '../src/mofo-adapter.js';
 
 function fakeMofo(initial = []) {
   const items = structuredClone(initial);
@@ -49,4 +49,25 @@ test('updates only the current-session runtime state of one item', () => {
   assert.equal(item.htmlTemplate, '保持不变');
   assert.equal(item.state.summary, '新的总结');
   assert.equal(item.lastUpdatedBy, 'read-only-test');
+});
+
+test('upgrades only the explicitly managed investigation item and keeps a legacy backup', () => {
+  const mofo = fakeMofo([
+    { id: 'yssa_investigation_report', name: '角色大调查', state: { target: '林姐', profile: '旧人物侧写' } },
+    { id: 'user-item', name: '用户页面', htmlTemplate: '不要修改', state: { value: 1 } },
+  ]);
+  const pack = { items: [{
+    id: 'yssa_investigation_report',
+    name: '角色大调查',
+    htmlTemplate: '<section>{{orientation}}</section>',
+    promptTemplate: '新版提示词',
+    initialState: { target: '未选择', orientation: '等待生成', bodyData: '等待生成', userNote: '等待生成' },
+  }] };
+  const upgraded = upgradeManagedItems(mofo, pack, ['yssa_investigation_report']);
+  assert.deepEqual(upgraded, ['yssa_investigation_report']);
+  const investigation = mofo.getItemById('yssa_investigation_report');
+  assert.equal(investigation.htmlTemplate, '<section>{{orientation}}</section>');
+  assert.equal(investigation.state.target, '林姐');
+  assert.equal(investigation.state._legacyState.profile, '旧人物侧写');
+  assert.equal(mofo.getItemById('user-item').htmlTemplate, '不要修改');
 });

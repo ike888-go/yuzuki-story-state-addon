@@ -1,5 +1,5 @@
 import { readMemorySnapshot, hasMemoryRuntime } from './memory-adapter.js';
-import { installMissingItems, resolveMofoData, updateItemState } from './mofo-adapter.js';
+import { installMissingItems, resolveMofoData, updateItemState, upgradeManagedItems } from './mofo-adapter.js';
 import { clonePack, loadImportPack, MEMORY_ITEM_ID } from './pack-registry.js';
 import { GenerationService, GENERATION_TOOLS } from './generation-service.js';
 
@@ -9,9 +9,10 @@ const DEFAULT_SETTINGS = Object.freeze({
   autoInstall: true,
   memorySync: true,
   packRevision: 0,
+  promptOverrides: {},
 });
 
-const CONTENT_REVISION = 1;
+const CONTENT_REVISION = 2;
 const RETRY_DELAYS = Object.freeze([800, 1800, 4000, 9000, 18000, 30000]);
 
 function clone(value) {
@@ -31,7 +32,10 @@ export class ContentAddonRuntime {
     this.pendingTimers = new Set();
     this.retryIndex = 0;
     this.syncChain = Promise.resolve();
-    this.generation = new GenerationService(() => this.getContext());
+    this.generation = new GenerationService(
+      () => this.getContext(),
+      (toolId) => this.getPrompt(toolId),
+    );
     this.status = {
       active: false,
       phoneReady: false,
@@ -70,6 +74,47 @@ export class ContentAddonRuntime {
 
   getGenerationItem(toolId) {
     return this.generation.getItem(toolId);
+  }
+
+  getDefaultPrompt(toolId) {
+    const item = this.pack?.items?.find((candidate) => candidate.id === toolId);
+    return String(item?.promptTemplate || '');
+  }
+
+  getPrompt(toolId) {
+    const override = this.settings.promptOverrides?.[toolId];
+    return typeof override === 'string' && override.trim() ? override : this.getDefaultPrompt(toolId);
+  }
+
+  isPromptCustomized(toolId) {
+    return typeof this.settings.promptOverrides?.[toolId] === 'string'
+      && Boolean(this.settings.promptOverrides[toolId].trim());
+  }
+
+  savePrompt(toolId, value) {
+    if (!GENERATION_TOOLS.some((tool) => tool.id === toolId)) throw new Error('未知的提示词项目。');
+    const prompt = String(value || '').replace(/\u0000/g, '').trim();
+    if (!prompt) throw new Error('提示词不能为空；如需恢复，请使用“恢复默认”。');
+    if (prompt.length > 32000) throw new Error('提示词不能超过 32000 个字符。');
+    this.settings.promptOverrides = { ...(this.settings.promptOverrides || {}), [toolId]: prompt };
+    this.context.extensionSettings[EXTENSION_KEY] = this.settings;
+    this.context.saveSettingsDebounced?.();
+    return prompt;
+  }
+
+  resetPrompt(toolId) {
+    const next = { ...(this.settings.promptOverrides || {}) };
+    delete next[toolId];
+    this.settings.promptOverrides = next;
+    this.context.extensionSettings[EXTENSION_KEY] = this.settings;
+    this.context.saveSettingsDebounced?.();
+    return this.getDefaultPrompt(toolId);
+  }
+
+  resetAllPrompts() {
+    this.settings.promptOverrides = {};
+    this.context.extensionSettings[EXTENSION_KEY] = this.settings;
+    this.context.saveSettingsDebounced?.();
   }
 
   getSuggestedTargets() {
@@ -137,6 +182,9 @@ export class ContentAddonRuntime {
     this.context = this.getContext();
     const stored = this.context.extensionSettings?.[EXTENSION_KEY];
     this.settings = { ...DEFAULT_SETTINGS, ...(stored && typeof stored === 'object' ? stored : {}) };
+    this.settings.promptOverrides = this.settings.promptOverrides && typeof this.settings.promptOverrides === 'object'
+      ? { ...this.settings.promptOverrides }
+      : {};
     this.context.extensionSettings[EXTENSION_KEY] = this.settings;
     this.context.saveSettingsDebounced?.();
     this.active = true;
@@ -225,7 +273,14 @@ export class ContentAddonRuntime {
       }
 
       this.retryIndex = 0;
-      const result = installMissingItems(mofoData, pack);
+      const previousRevision = Number(this.settings.packRevision || 0);
+      const manualInstall = reason === 'settings' || reason === 'public-api';
+      const result = previousRevision === 0 || manualInstall
+        ? installMissingItems(mofoData, pack)
+        : { installed: [], existing: [], conflicts: [] };
+      const upgraded = previousRevision < 2
+        ? upgradeManagedItems(mofoData, pack, ['yssa_investigation_report'])
+        : [];
       this.settings.packRevision = CONTENT_REVISION;
       this.context.saveSettingsDebounced?.();
       this.setStatus({
@@ -237,7 +292,9 @@ export class ContentAddonRuntime {
         conflictCount: result.conflicts.length,
         message: result.conflicts.length
           ? `已连接魔坊，但有 ${result.conflicts.length} 个同名模板未自动覆盖。`
-          : (result.installed.length ? `已安装 ${result.installed.length} 个缺失模板。` : '魔坊内容模板已就绪。'),
+          : (upgraded.length
+              ? '角色大调查已升级为原版完整档案结构。'
+              : (result.installed.length ? `已安装 ${result.installed.length} 个缺失模板。` : '魔坊内容模板已就绪。')),
       });
       if (this.settings.memorySync) await this.refreshMemoryNow(reason, mofoData);
       return this.getStatus();

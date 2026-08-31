@@ -17,10 +17,10 @@ export const GENERATION_TOOLS = Object.freeze([
     name: '角色大调查',
     icon: '⌕',
     eyebrow: 'PRIVATE DOSSIER',
-    description: '指定一名角色，按事实、疑点和不确定信息生成调查档案。',
+    description: '按原版结构生成角色的完整私密档案，可附加要求或接续当前档案。',
     needsTarget: true,
     temperature: 0.45,
-    maxTokens: 2200,
+    maxTokens: 8000,
   },
   {
     id: 'yssa_achievement_book',
@@ -186,13 +186,25 @@ function buildMemoryContext(mofoData) {
   return parts.length ? parts.join('\n') : '暂无可用记忆快照。';
 }
 
-export function buildGenerationMessages({ context, item, mofoData, target = '' }) {
+export function buildGenerationMessages({
+  context,
+  item,
+  mofoData,
+  target = '',
+  promptOverride = '',
+  extraInstructions = '',
+  continueFromCurrent = false,
+}) {
   const tool = TOOL_BY_ID.get(item?.id);
   if (!tool) throw new Error('不支持这个生成项目。');
   const targetLine = tool.needsTarget ? `\n指定调查对象：${text(target, 160)}` : '';
   const schema = JSON.stringify(item.initialState || item.state || {});
-  const prompt = text(item.promptTemplate, 12000);
+  const prompt = text(promptOverride || item.promptTemplate, 32000);
   if (!prompt) throw new Error('这个魔坊模板没有生成提示词。');
+  const extra = text(extraInstructions, 4000);
+  const baseline = continueFromCurrent && isPlainObject(item?.state)
+    ? `\n【当前档案基线】\n${JSON.stringify(item.state)}\n请根据新剧情更新这份基线，仍返回包含全部字段的完整 JSON。未变化字段保留原值。`
+    : '';
 
   return [
     {
@@ -208,6 +220,8 @@ export function buildGenerationMessages({ context, item, mofoData, target = '' }
       role: 'user',
       content: [
         `任务：${prompt}${targetLine}`,
+        extra ? `\n【本次额外要求】\n${extra}` : '',
+        baseline,
         `\n【角色与场景】\n${buildCharacterContext(context)}`,
         `\n【柚月记忆快照】\n${buildMemoryContext(mofoData)}`,
         `\n【最近剧情】\n${buildRecentChat(context)}`,
@@ -223,8 +237,9 @@ export function sanitizeGenerationError(error) {
 }
 
 export class GenerationService {
-  constructor(getContext) {
+  constructor(getContext, getPromptOverride = () => '') {
     this.getContext = getContext;
+    this.getPromptOverride = getPromptOverride;
     this.activeController = null;
     this.activeToolId = '';
   }
@@ -257,7 +272,7 @@ export class GenerationService {
     this.activeController?.abort();
   }
 
-  async generate(toolId, { target = '' } = {}) {
+  async generate(toolId, { target = '', extraInstructions = '', continueFromCurrent = false } = {}) {
     const tool = this.getTool(toolId);
     if (!tool) throw new Error('未知的生成项目。');
     if (this.activeController) throw new Error('已有生成任务正在进行，请先停止或等待完成。');
@@ -279,6 +294,9 @@ export class GenerationService {
         item,
         mofoData,
         target,
+        promptOverride: this.getPromptOverride(toolId, item.promptTemplate),
+        extraInstructions,
+        continueFromCurrent,
       });
       const result = await apiManager.callAI(messages, {
         appId: 'phone_online',

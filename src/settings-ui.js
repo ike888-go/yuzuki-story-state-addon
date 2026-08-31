@@ -61,6 +61,9 @@ export class SettingsUI {
     const open = addTextElement(actions, 'button', 'menu_button', '打开剧情工坊');
     open.type = 'button';
     open.addEventListener('click', () => this.openPhoneApp(), { signal: this.abortController.signal });
+    const prompts = addTextElement(actions, 'button', 'menu_button', '编辑生成提示词');
+    prompts.type = 'button';
+    prompts.addEventListener('click', () => this.openPhoneApp('prompt-settings'), { signal: this.abortController.signal });
     const refresh = addTextElement(actions, 'button', 'menu_button', '刷新记忆快照');
     refresh.type = 'button';
     refresh.addEventListener('click', () => this.runAction(() => this.runtime.refreshMemory('settings')), { signal: this.abortController.signal });

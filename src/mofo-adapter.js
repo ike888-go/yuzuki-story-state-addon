@@ -49,6 +49,37 @@ export function installMissingItems(mofoData, pack) {
   return result;
 }
 
+export function upgradeManagedItems(mofoData, pack, itemIds = []) {
+  if (!isMofoData(mofoData)) return [];
+  const definitions = new Map((pack?.items || []).map((item) => [String(item?.id || ''), item]));
+  const upgraded = [];
+  for (const itemId of itemIds) {
+    const definition = definitions.get(String(itemId));
+    const current = mofoData.getItemById?.(itemId)
+      || mofoData.getItems().find((item) => String(item?.id || '') === String(itemId));
+    if (!definition || !current) continue;
+    const nextState = Object.hasOwn(current.state || {}, 'orientation')
+      && Object.hasOwn(current.state || {}, 'bodyData')
+      ? current.state
+      : {
+          ...clone(definition.initialState || {}),
+          target: current.state?.target || definition.initialState?.target || '',
+          userNote: current.state?.profile
+            ? `旧版档案摘要：${String(current.state.profile).slice(0, 800)}`
+            : definition.initialState?.userNote || '',
+          _legacyState: clone(current.state || {}),
+        };
+    const updated = mofoData.updateItem(itemId, {
+      ...clone(definition),
+      state: clone(nextState),
+      lastUpdatedBy: 'yuzuki-addon-content-upgrade',
+      updatedAt: Date.now(),
+    });
+    if (updated) upgraded.push(itemId);
+  }
+  return upgraded;
+}
+
 export function updateItemState(mofoData, itemId, state, source = 'yuzuki-addon') {
   if (!isMofoData(mofoData)) return null;
   const item = mofoData.getItemById?.(itemId)

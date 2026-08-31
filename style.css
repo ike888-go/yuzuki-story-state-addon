@@ -71,7 +71,8 @@
 }
 
 .yssa-phone-app button,
-.yssa-phone-app input {
+.yssa-phone-app input,
+.yssa-phone-app textarea {
   font: inherit;
   touch-action: manipulation;
 }
@@ -122,6 +123,15 @@
   font-size: 31px;
   line-height: 1;
   cursor: pointer;
+}
+
+.yssa-icon-button--small {
+  width: 40px;
+  height: 40px;
+  justify-self: end;
+  border-radius: 13px;
+  color: #6759bd;
+  font-size: 19px;
 }
 
 .yssa-connection-dot {
@@ -379,6 +389,182 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--tool-color) 12%, transparent);
 }
 
+.yssa-investigation-options {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 11px;
+  padding: 12px 13px;
+  border: 1px solid rgba(196, 111, 96, 0.15);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.yssa-investigation-options > label > span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--yssa-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.yssa-investigation-options textarea {
+  width: 100%;
+  min-height: 88px;
+  padding: 10px 12px;
+  resize: vertical;
+  border: 1px solid rgba(196, 111, 96, 0.17);
+  border-radius: 12px;
+  outline: none;
+  color: var(--yssa-ink);
+  background: #fbf8f8;
+  line-height: 1.5;
+}
+
+.yssa-switch-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  padding-top: 3px;
+}
+
+.yssa-switch-row input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: #c46f60;
+}
+
+.yssa-switch-row strong,
+.yssa-switch-row small {
+  display: block;
+}
+
+.yssa-switch-row small {
+  margin-top: 2px;
+  color: var(--yssa-muted);
+  font-size: 10px;
+}
+
+.yssa-prompt-notice,
+.yssa-prompt-editor {
+  padding: 14px;
+  border: 1px solid var(--yssa-line);
+  border-radius: 18px;
+  background: var(--yssa-card);
+  box-shadow: 0 7px 23px rgba(55, 43, 102, 0.05);
+}
+
+.yssa-prompt-notice p,
+.yssa-prompt-editor > p,
+.yssa-prompt-feedback {
+  margin: 4px 0 0;
+  color: var(--yssa-muted);
+  font-size: 11px;
+}
+
+.yssa-prompt-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 10px 0;
+}
+
+.yssa-prompt-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--yssa-line);
+  border-radius: 13px;
+  color: var(--yssa-ink);
+  background: rgba(255, 255, 255, 0.76);
+  cursor: pointer;
+}
+
+.yssa-prompt-tabs button.is-active {
+  border-color: rgba(117, 99, 215, 0.34);
+  color: var(--yssa-purple-dark);
+  background: rgba(117, 99, 215, 0.1);
+}
+
+.yssa-prompt-editor .yssa-section-heading > span {
+  padding: 4px 8px;
+  border-radius: 99px;
+  color: #77728d;
+  background: rgba(117, 99, 215, 0.08);
+  font-size: 10px;
+}
+
+.yssa-prompt-editor .yssa-section-heading > span.is-custom {
+  color: #5d4eb4;
+  background: rgba(117, 99, 215, 0.15);
+}
+
+.yssa-prompt-editor > label {
+  display: block;
+  margin: 9px 0 6px;
+  color: var(--yssa-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.yssa-prompt-editor textarea {
+  width: 100%;
+  min-height: 330px;
+  padding: 12px;
+  resize: vertical;
+  border: 1px solid rgba(86, 73, 148, 0.16);
+  border-radius: 13px;
+  outline: none;
+  color: #3e3a4d;
+  background: #f9f8fc;
+  font: 12px/1.6 ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+
+.yssa-prompt-editor textarea:focus,
+.yssa-investigation-options textarea:focus {
+  border-color: var(--yssa-purple);
+  box-shadow: 0 0 0 3px rgba(117, 99, 215, 0.12);
+}
+
+.yssa-prompt-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.yssa-prompt-actions button,
+.yssa-reset-all {
+  min-height: 44px;
+  border: 0;
+  border-radius: 13px;
+  color: #665f78;
+  background: rgba(117, 99, 215, 0.09);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.yssa-prompt-actions button.is-primary {
+  color: white;
+  background: linear-gradient(135deg, #8876e3, #6654c2);
+}
+
+.yssa-reset-all {
+  width: 100%;
+  margin-top: 10px;
+  color: #a4434b;
+  background: rgba(205, 82, 89, 0.08);
+}
+
+.yssa-prompt-feedback {
+  min-height: 20px;
+  padding: 6px 3px 0;
+  text-align: center;
+}
+
 .yssa-generation-status {
   display: grid;
   grid-template-columns: 12px minmax(0, 1fr);
@@ -531,7 +717,8 @@
 }
 
 .yssa-phone-app button:focus-visible,
-.yssa-phone-app input:focus-visible {
+.yssa-phone-app input:focus-visible,
+.yssa-phone-app textarea:focus-visible {
   outline: 3px solid rgba(117, 99, 215, 0.24);
   outline-offset: 2px;
 }

@@ -21,6 +21,18 @@ test('content pack templates contain no executable markup', async () => {
   }
 });
 
+test('investigation template uses the original dossier modules instead of the generic report', async () => {
+  const pack = validateImportPack(JSON.parse(await readFile(packUrl, 'utf8')));
+  const investigation = pack.items.find((item) => item.id === 'yssa_investigation_report');
+  assert.ok(investigation);
+  for (const key of ['bodyData', 'orientation', 'purityDetails', 'partners', 'fertilityHistory', 'oralDevelopment', 'firstExperience', 'voiceProfile']) {
+    assert.ok(Object.hasOwn(investigation.initialState, key), `missing ${key}`);
+  }
+  assert.match(investigation.promptTemplate, /基础档案/);
+  assert.match(investigation.promptTemplate, /综合魅力评估/);
+  assert.doesNotMatch(investigation.promptTemplate, /下一步调查或互动建议/);
+});
+
 test('rejects duplicate stable IDs', () => {
   const item = { id: MEMORY_ITEM_ID, name: '记忆', tagName: '记忆', htmlTemplate: '<section></section>', initialState: {} };
   assert.throws(() => validateImportPack({ type: PACK_TYPE, version: 1, items: [item, item] }), /重复/);

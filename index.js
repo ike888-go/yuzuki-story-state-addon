@@ -2,7 +2,7 @@ import { ContentAddonRuntime } from './src/runtime.js';
 import { SettingsUI } from './src/settings-ui.js';
 import { StoryStudioPhoneApp, openStoryStudioApp } from './src/phone-studio-app.js';
 
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 
 let runtime = null;
 let settingsUI = null;
@@ -29,7 +29,7 @@ export function onActivate() {
     phoneApp?.onRuntimeStatus(status);
   });
   phoneApp = new StoryStudioPhoneApp(runtime);
-  settingsUI = new SettingsUI(runtime, () => phoneApp?.openFromSettings());
+  settingsUI = new SettingsUI(runtime, (view) => phoneApp?.openFromSettings(view));
   settingsUI.start();
   phoneApp.start();
   exposeApi();

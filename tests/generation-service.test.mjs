@@ -47,6 +47,29 @@ test('builds bounded roleplay context without requesting a normal chat turn', ()
   assert.match(messages[1].content, /调查林姐/);
 });
 
+test('uses an editable prompt, one-off instructions and the current dossier baseline', () => {
+  const item = {
+    id: 'yssa_investigation_report',
+    promptTemplate: '默认提示词',
+    initialState: { target: '', portrait: '' },
+    state: { target: '林姐', portrait: '旧档案' },
+  };
+  const messages = buildGenerationMessages({
+    context: { name1: '用户', name2: '角色', chat: [] },
+    item,
+    mofoData: { getItemById: () => null, getItems: () => [] },
+    target: '林姐',
+    promptOverride: '自定义完整提示词',
+    extraInstructions: '侧重心理变化',
+    continueFromCurrent: true,
+  });
+  assert.match(messages[1].content, /自定义完整提示词/);
+  assert.doesNotMatch(messages[1].content, /任务：默认提示词/);
+  assert.match(messages[1].content, /侧重心理变化/);
+  assert.match(messages[1].content, /当前档案基线/);
+  assert.match(messages[1].content, /旧档案/);
+});
+
 test('uses the official phone AI manager and saves generated state to Mofo', async (t) => {
   const items = [{
     id: 'yssa_current_story_state',
