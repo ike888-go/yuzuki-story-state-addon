@@ -34,13 +34,6 @@
       "fallback": null
     },
     {
-      "id": "yuzuki-phone-mofo-data",
-      "owner": "provider",
-      "symbol": "window.VirtualPhone.cachedMofoData",
-      "required": false,
-      "fallback": "保留内置魔坊 JSON 下载；打开一次柚月手机的魔坊后再自动安装。"
-    },
-    {
       "id": "yuzuki-memory-runtime",
       "owner": "provider",
       "symbol": "window.YuzukiMemory",

@@ -1,22 +1,25 @@
 import { readMemorySnapshot, hasMemoryRuntime } from './memory-adapter.js';
-import { installMissingItems, resolveMofoData, updateItemState, upgradeManagedItems } from './mofo-adapter.js';
-import { clonePack, loadImportPack, MEMORY_ITEM_ID } from './pack-registry.js';
+import { cloneContentRegistry, loadContentRegistry } from './content-registry.js';
 import { GenerationService, GENERATION_TOOLS } from './generation-service.js';
+import { NativeStateStore } from './native-state-store.js';
 
 export const EXTENSION_KEY = 'yuzuki_story_state_addon';
 
 const DEFAULT_SETTINGS = Object.freeze({
-  autoInstall: true,
   memorySync: true,
-  packRevision: 0,
+  contentRevision: 1,
   promptOverrides: {},
+  nativeStates: {},
 });
 
-const CONTENT_REVISION = 3;
-const RETRY_DELAYS = Object.freeze([800, 1800, 4000, 9000, 18000, 30000]);
+const PHONE_RETRY_DELAYS = Object.freeze([600, 1400, 3000, 6000, 12000, 24000]);
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 export class ContentAddonRuntime {
@@ -24,26 +27,34 @@ export class ContentAddonRuntime {
     this.onStatus = onStatus;
     this.context = null;
     this.settings = { ...DEFAULT_SETTINGS };
-    this.pack = null;
+    this.registry = null;
+    this.memorySnapshot = readMemorySnapshot(null);
     this.active = false;
     this.listeners = [];
     this.windowListeners = [];
-    this.retryTimer = null;
     this.pendingTimers = new Set();
-    this.retryIndex = 0;
+    this.phoneRetryTimer = null;
+    this.phoneRetryIndex = 0;
     this.syncChain = Promise.resolve();
-    this.generation = new GenerationService(
-      () => this.getContext(),
-      (toolId) => this.getPrompt(toolId),
-    );
+    this.stateStore = new NativeStateStore({
+      getContext: () => this.getContext(),
+      getSettings: () => this.settings,
+      saveSettings: () => this.persistSettings(),
+      getRegistry: () => this.registry,
+    });
+    this.generation = new GenerationService({
+      getContext: () => this.getContext(),
+      getItem: (toolId) => this.stateStore.getItem(toolId),
+      saveState: (toolId, state) => this.stateStore.update(toolId, state),
+      getMemorySnapshot: () => this.memorySnapshot,
+      getPromptOverride: (toolId) => this.getPrompt(toolId),
+    });
     this.status = {
       active: false,
       phoneReady: false,
-      mofoReady: false,
       memoryReady: false,
-      installedCount: 0,
-      existingCount: 0,
-      conflictCount: 0,
+      storageReady: false,
+      chatKey: '',
       lastSync: '',
       message: '尚未启动',
     };
@@ -55,13 +66,15 @@ export class ContentAddonRuntime {
     return context;
   }
 
-  async loadPack() {
-    if (!this.pack) this.pack = await loadImportPack();
-    return clonePack(this.pack);
+  persistSettings() {
+    if (!this.context?.extensionSettings) return;
+    this.context.extensionSettings[EXTENSION_KEY] = this.settings;
+    this.context.saveSettingsDebounced?.();
   }
 
-  getImportPack() {
-    return this.pack ? clonePack(this.pack) : null;
+  async loadContent() {
+    if (!this.registry) this.registry = await loadContentRegistry();
+    return cloneContentRegistry(this.registry);
   }
 
   getStatus() {
@@ -77,7 +90,7 @@ export class ContentAddonRuntime {
   }
 
   getDefaultPrompt(toolId) {
-    const item = this.pack?.items?.find((candidate) => candidate.id === toolId);
+    const item = this.registry?.items?.find((candidate) => candidate.id === toolId);
     return String(item?.promptTemplate || '');
   }
 
@@ -92,13 +105,12 @@ export class ContentAddonRuntime {
   }
 
   savePrompt(toolId, value) {
-    if (!GENERATION_TOOLS.some((tool) => tool.id === toolId)) throw new Error('未知的提示词项目。');
+    if (!GENERATION_TOOLS.some((tool) => tool.id === toolId)) throw new Error('未知的生成栏目。');
     const prompt = String(value || '').replace(/\u0000/g, '').trim();
     if (!prompt) throw new Error('提示词不能为空；如需恢复，请使用“恢复默认”。');
     if (prompt.length > 32000) throw new Error('提示词不能超过 32000 个字符。');
     this.settings.promptOverrides = { ...(this.settings.promptOverrides || {}), [toolId]: prompt };
-    this.context.extensionSettings[EXTENSION_KEY] = this.settings;
-    this.context.saveSettingsDebounced?.();
+    this.persistSettings();
     return prompt;
   }
 
@@ -106,15 +118,13 @@ export class ContentAddonRuntime {
     const next = { ...(this.settings.promptOverrides || {}) };
     delete next[toolId];
     this.settings.promptOverrides = next;
-    this.context.extensionSettings[EXTENSION_KEY] = this.settings;
-    this.context.saveSettingsDebounced?.();
+    this.persistSettings();
     return this.getDefaultPrompt(toolId);
   }
 
   resetAllPrompts() {
     this.settings.promptOverrides = {};
-    this.context.extensionSettings[EXTENSION_KEY] = this.settings;
-    this.context.saveSettingsDebounced?.();
+    this.persistSettings();
   }
 
   getSuggestedTargets() {
@@ -125,11 +135,9 @@ export class ContentAddonRuntime {
     return this.generation.generate(toolId, options);
   }
 
-  updateToolState(toolId, state, source = 'yuzuki-story-studio') {
-    const mofoData = resolveMofoData(globalThis);
-    if (!mofoData) throw new Error('魔坊数据层尚未就绪。');
-    const updated = updateItemState(mofoData, toolId, state, source);
-    if (!updated) throw new Error('写入当前聊天失败。');
+  updateToolState(toolId, state) {
+    const updated = this.stateStore.update(toolId, state);
+    if (!updated) throw new Error('保存到当前聊天失败。');
     return updated;
   }
 
@@ -159,15 +167,11 @@ export class ContentAddonRuntime {
 
   bindEvents() {
     const events = this.context.eventTypes || this.context.event_types || {};
-    this.bindContextEvent(events.APP_READY, () => this.scheduleSync('app-ready', 0));
-    this.bindContextEvent(events.CHAT_CHANGED, () => this.scheduleSync('chat-changed', 350));
-    this.bindContextEvent(events.MESSAGE_RECEIVED, () => this.scheduleSync('message-received', 250));
-    this.bindWindowEvent('yzm-memory-state-updated', () => this.scheduleMemoryRefresh('memory-updated', 80));
-    this.bindWindowEvent('yzm-memory-session-ready', () => this.scheduleMemoryRefresh('memory-session-ready', 80));
-  }
-
-  shouldAutoInstall() {
-    return this.settings.autoInstall && Number(this.settings.packRevision || 0) < CONTENT_REVISION;
+    this.bindContextEvent(events.APP_READY, () => this.scheduleRefresh('app-ready', 0));
+    this.bindContextEvent(events.CHAT_CHANGED, () => this.scheduleRefresh('chat-changed', 120));
+    this.bindContextEvent(events.MESSAGE_RECEIVED, () => this.scheduleRefresh('message-received', 220));
+    this.bindWindowEvent('yzm-memory-state-updated', () => this.scheduleRefresh('memory-updated', 80));
+    this.bindWindowEvent('yzm-memory-session-ready', () => this.scheduleRefresh('memory-session-ready', 80));
   }
 
   setTimer(callback, delay) {
@@ -179,28 +183,21 @@ export class ContentAddonRuntime {
     return timer;
   }
 
-  clearTimer(timer) {
-    if (timer === undefined || timer === null) return;
-    globalThis.clearTimeout?.(timer);
-    this.pendingTimers.delete(timer);
-  }
-
   async start() {
     if (this.active) return this.getStatus();
     this.context = this.getContext();
     const stored = this.context.extensionSettings?.[EXTENSION_KEY];
-    this.settings = { ...DEFAULT_SETTINGS, ...(stored && typeof stored === 'object' ? stored : {}) };
-    this.settings.promptOverrides = this.settings.promptOverrides && typeof this.settings.promptOverrides === 'object'
-      ? { ...this.settings.promptOverrides }
-      : {};
-    this.context.extensionSettings[EXTENSION_KEY] = this.settings;
-    this.context.saveSettingsDebounced?.();
+    this.settings = { ...DEFAULT_SETTINGS, ...(isPlainObject(stored) ? stored : {}) };
+    this.settings.promptOverrides = isPlainObject(this.settings.promptOverrides) ? { ...this.settings.promptOverrides } : {};
+    this.settings.nativeStates = isPlainObject(this.settings.nativeStates) ? this.settings.nativeStates : {};
+    this.settings.contentRevision = 1;
+    this.persistSettings();
     this.active = true;
     this.bindEvents();
-    await this.loadPack();
-    this.setStatus({ active: true, message: '正在连接柚月手机与记忆插件…' });
-    if (this.shouldAutoInstall()) await this.installMissing('startup');
-    else await this.refreshMemory('startup');
+    await this.loadContent();
+    this.setStatus({ active: true, storageReady: true, message: '原生 App 数据层已就绪，正在连接柚月手机与记忆插件…' });
+    await this.refreshMemory('startup');
+    this.schedulePhoneCheck();
     return this.getStatus();
   }
 
@@ -214,139 +211,67 @@ export class ContentAddonRuntime {
     for (const [event, handler] of this.windowListeners) globalThis.removeEventListener?.(event, handler);
     this.listeners = [];
     this.windowListeners = [];
-    if (this.retryTimer) this.clearTimer(this.retryTimer);
     for (const timer of this.pendingTimers) globalThis.clearTimeout?.(timer);
     this.pendingTimers.clear();
-    this.retryTimer = null;
+    this.phoneRetryTimer = null;
     this.active = false;
     this.setStatus({ active: false, message: '扩展已停用' });
   }
 
-  scheduleSync(reason, delay = 0) {
+  schedulePhoneCheck() {
     if (!this.active) return;
-    if (this.retryTimer) this.clearTimer(this.retryTimer);
-    this.retryTimer = this.setTimer(() => {
-      this.retryTimer = null;
-      const action = this.shouldAutoInstall()
-        ? this.installMissing(reason)
-        : this.refreshMemory(reason);
-      action.catch((error) => this.handleError(error));
+    const ready = Boolean(globalThis.VirtualPhone?.home?.phoneShell?.setContent);
+    if (ready) {
+      this.phoneRetryIndex = 0;
+      this.phoneRetryTimer = null;
+      this.setStatus({ phoneReady: true, message: this.memorySnapshot.available ? '剧情工坊原生 App 与柚月记忆均已连接。' : '剧情工坊原生 App 已就绪，等待柚月记忆插件。' });
+      return;
+    }
+    if (this.phoneRetryIndex >= PHONE_RETRY_DELAYS.length) {
+      this.setStatus({ phoneReady: false, message: '尚未检测到柚月手机；扩展会在下次打开手机时继续接入。' });
+      return;
+    }
+    if (this.phoneRetryTimer) return;
+    const delay = PHONE_RETRY_DELAYS[this.phoneRetryIndex];
+    this.phoneRetryIndex += 1;
+    this.phoneRetryTimer = this.setTimer(() => {
+      this.phoneRetryTimer = null;
+      this.schedulePhoneCheck();
     }, delay);
   }
 
-  scheduleMemoryRefresh(reason, delay = 0) {
+  scheduleRefresh(reason, delay = 0) {
     if (!this.active) return;
-    this.setTimer(() => {
-      this.refreshMemory(reason).catch((error) => this.handleError(error));
-    }, delay);
-  }
-
-  scheduleRetry() {
-    if (!this.active || this.retryTimer || this.retryIndex >= RETRY_DELAYS.length) return;
-    const delay = RETRY_DELAYS[this.retryIndex];
-    this.retryIndex += 1;
-    this.retryTimer = this.setTimer(() => {
-      this.retryTimer = null;
-      const action = this.shouldAutoInstall()
-        ? this.installMissing('phone-wait')
-        : this.refreshMemory('phone-wait');
-      action.catch((error) => this.handleError(error));
-    }, delay);
+    this.setTimer(() => this.refreshMemory(reason).catch((error) => this.handleError(error)), delay);
   }
 
   handleError(error) {
-    console.error('[柚月魔坊内容增量包]', error);
+    console.error('[柚月剧情工坊]', error);
     this.setStatus({ message: `操作失败：${error.message}` });
   }
 
-  installMissing(reason = 'manual') {
+  refreshMemory(reason = 'manual') {
     this.syncChain = this.syncChain.then(async () => {
       if (!this.active) return this.getStatus();
-      const pack = await this.loadPack();
-      const phone = globalThis.VirtualPhone;
-      const mofoData = resolveMofoData(globalThis);
-      const memoryReady = hasMemoryRuntime(globalThis.YuzukiMemory);
-
-      if (!mofoData) {
-        this.setStatus({
-          phoneReady: Boolean(phone),
-          mofoReady: false,
-          memoryReady,
-          message: phone
-            ? '等待魔坊数据层；打开一次柚月手机的魔坊即可继续。'
-            : '未检测到柚月手机。也可以先下载魔坊导入包手动导入。',
-        });
-        this.scheduleRetry();
-        return this.getStatus();
-      }
-
-      this.retryIndex = 0;
-      const previousRevision = Number(this.settings.packRevision || 0);
-      const manualInstall = reason === 'settings' || reason === 'public-api';
-      const result = previousRevision === 0 || manualInstall
-        ? installMissingItems(mofoData, pack)
-        : { installed: [], existing: [], conflicts: [] };
-      const upgraded = previousRevision < CONTENT_REVISION
-        ? upgradeManagedItems(mofoData, pack, GENERATION_TOOLS.map((tool) => tool.id))
-        : [];
-      this.settings.packRevision = CONTENT_REVISION;
-      this.context.saveSettingsDebounced?.();
+      this.memorySnapshot = readMemorySnapshot(globalThis.YuzukiMemory);
+      const timestamp = new Date().toLocaleString('zh-CN', { hour12: false });
+      const phoneReady = Boolean(globalThis.VirtualPhone?.home?.phoneShell?.setContent);
       this.setStatus({
-        phoneReady: true,
-        mofoReady: true,
-        memoryReady,
-        installedCount: result.installed.length,
-        existingCount: result.existing.length,
-        conflictCount: result.conflicts.length,
-        message: result.conflicts.length
-          ? `已连接魔坊，但有 ${result.conflicts.length} 个同名模板未自动覆盖。`
-          : (upgraded.length
-              ? '剧情工坊已升级为完整 App 页面与结构化内容。'
-              : (result.installed.length ? `已安装 ${result.installed.length} 个缺失模板。` : '魔坊内容模板已就绪。')),
+        phoneReady,
+        memoryReady: hasMemoryRuntime(globalThis.YuzukiMemory),
+        storageReady: true,
+        chatKey: this.stateStore.getChatKey(),
+        lastSync: this.memorySnapshot.available ? timestamp : this.status.lastSync,
+        message: this.memorySnapshot.available
+          ? `已只读刷新当前聊天记忆（${reason}）。`
+          : '原生 App 数据层已就绪，正在等待柚月记忆插件。',
       });
-      if (this.settings.memorySync) await this.refreshMemoryNow(reason, mofoData);
+      if (!phoneReady) this.schedulePhoneCheck();
       return this.getStatus();
     }).catch((error) => {
       this.handleError(error);
       return this.getStatus();
     });
     return this.syncChain;
-  }
-
-  refreshMemory(reason = 'manual') {
-    this.syncChain = this.syncChain.then(() => this.refreshMemoryNow(reason)).catch((error) => {
-      this.handleError(error);
-      return this.getStatus();
-    });
-    return this.syncChain;
-  }
-
-  async refreshMemoryNow(reason = 'manual', suppliedMofoData = null) {
-    if (!this.active) return this.getStatus();
-    const mofoData = suppliedMofoData || resolveMofoData(globalThis);
-    const snapshot = readMemorySnapshot(globalThis.YuzukiMemory);
-    if (!mofoData) {
-      this.setStatus({
-        phoneReady: Boolean(globalThis.VirtualPhone),
-        mofoReady: false,
-        memoryReady: snapshot.available,
-        message: '记忆快照尚未写入：魔坊数据层未就绪。',
-      });
-      this.scheduleRetry();
-      return this.getStatus();
-    }
-
-    const updated = updateItemState(mofoData, MEMORY_ITEM_ID, snapshot.state, 'yuzuki-memory-readonly');
-    const timestamp = new Date().toLocaleString('zh-CN', { hour12: false });
-    this.setStatus({
-      phoneReady: true,
-      mofoReady: true,
-      memoryReady: snapshot.available,
-      lastSync: updated ? timestamp : this.status.lastSync,
-      message: updated
-        ? (snapshot.available ? `记忆快照已只读刷新（${reason}）。` : '魔坊已就绪，正在等待柚月记忆插件。')
-        : '找不到记忆快照模板，请先安装缺失内容。',
-    });
-    return this.getStatus();
   }
 }

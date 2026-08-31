@@ -1,5 +1,3 @@
-import { resolveMofoData, updateItemState } from './mofo-adapter.js';
-
 export const GENERATION_TOOLS = Object.freeze([
   {
     id: 'yssa_current_story_state',
@@ -193,10 +191,8 @@ function buildRecentChat(context) {
   return rows.length ? rows.join('\n\n') : '当前聊天还没有可用的剧情消息。';
 }
 
-function buildMemoryContext(mofoData) {
-  const item = mofoData?.getItemById?.('yssa_memory_snapshot')
-    || mofoData?.getItems?.().find((candidate) => candidate?.id === 'yssa_memory_snapshot');
-  const state = isPlainObject(item?.state) ? item.state : {};
+function buildMemoryContext(memorySnapshot) {
+  const state = isPlainObject(memorySnapshot?.state) ? memorySnapshot.state : {};
   const parts = [];
   for (const key of ['summary', 'plot', 'characters', 'items', 'world']) {
     if (state[key]) parts.push(`${key}：${text(state[key], 1600)}`);
@@ -207,7 +203,7 @@ function buildMemoryContext(mofoData) {
 export function buildGenerationMessages({
   context,
   item,
-  mofoData,
+  memorySnapshot,
   target = '',
   promptOverride = '',
   extraInstructions = '',
@@ -218,7 +214,7 @@ export function buildGenerationMessages({
   const targetLine = tool.needsTarget ? `\n指定调查对象：${text(target, 160)}` : '';
   const schema = JSON.stringify(item.initialState || item.state || {});
   const prompt = text(promptOverride || item.promptTemplate, 32000);
-  if (!prompt) throw new Error('这个魔坊模板没有生成提示词。');
+  if (!prompt) throw new Error('这个栏目没有生成提示词。');
   const extra = text(extraInstructions, 4000);
   const baseline = continueFromCurrent && isPlainObject(item?.state)
     ? `\n【当前档案基线】\n${JSON.stringify(item.state)}\n请根据新剧情更新这份基线，仍返回包含全部字段的完整 JSON。未变化字段保留原值。`
@@ -242,7 +238,7 @@ export function buildGenerationMessages({
         extra ? `\n【本次额外要求】\n${extra}` : '',
         baseline,
         `\n【角色与场景】\n${buildCharacterContext(context)}`,
-        `\n【柚月记忆快照】\n${buildMemoryContext(mofoData)}`,
+        `\n【柚月记忆快照】\n${buildMemoryContext(memorySnapshot)}`,
         `\n【最近剧情】\n${buildRecentChat(context)}`,
       ].join('\n'),
     },
@@ -256,8 +252,17 @@ export function sanitizeGenerationError(error) {
 }
 
 export class GenerationService {
-  constructor(getContext, getPromptOverride = () => '') {
+  constructor({
+    getContext,
+    getItem,
+    saveState,
+    getMemorySnapshot = () => null,
+    getPromptOverride = () => '',
+  }) {
     this.getContext = getContext;
+    this.resolveItem = getItem;
+    this.saveState = saveState;
+    this.getMemorySnapshot = getMemorySnapshot;
     this.getPromptOverride = getPromptOverride;
     this.activeController = null;
     this.activeToolId = '';
@@ -268,11 +273,7 @@ export class GenerationService {
   }
 
   getItem(toolId) {
-    const mofoData = resolveMofoData(globalThis);
-    if (!mofoData) return null;
-    return mofoData.getItemById?.(toolId)
-      || mofoData.getItems().find((item) => String(item?.id || '') === String(toolId))
-      || null;
+    return this.resolveItem?.(toolId) || null;
   }
 
   getSuggestedTargets() {
@@ -297,10 +298,8 @@ export class GenerationService {
     if (this.activeController) throw new Error('已有生成任务正在进行，请先停止或等待完成。');
     if (tool.needsTarget && !text(target, 160)) throw new Error('请先填写调查对象。');
 
-    const mofoData = resolveMofoData(globalThis);
-    if (!mofoData) throw new Error('魔坊尚未就绪，请先打开一次柚月手机的魔坊。');
     const item = this.getItem(toolId);
-    if (!item) throw new Error('找不到对应模板，请先安装缺失模板。');
+    if (!item) throw new Error('找不到对应的原生 App 栏目。');
     const apiManager = globalThis.VirtualPhone?.apiManager;
     if (!apiManager?.callAI) throw new Error('柚月手机 API 管理器尚未就绪。');
 
@@ -311,7 +310,7 @@ export class GenerationService {
       const messages = buildGenerationMessages({
         context: this.getContext(),
         item,
-        mofoData,
+        memorySnapshot: this.getMemorySnapshot(),
         target,
         promptOverride: this.getPromptOverride(toolId, item.promptTemplate),
         extraInstructions,
@@ -329,8 +328,8 @@ export class GenerationService {
       const raw = result.summary || result.content || result.text || '';
       const parsed = parseGeneratedObject(raw);
       const state = normalizeGeneratedState(parsed, item.initialState, item.state);
-      const updated = updateItemState(mofoData, toolId, state, 'yuzuki-story-studio-ai');
-      if (!updated) throw new Error('生成成功，但写入魔坊状态失败。');
+      const updated = this.saveState?.(toolId, state);
+      if (!updated) throw new Error('生成成功，但保存到当前聊天失败。');
       return { tool: clone(tool), state: clone(state), item: clone(updated) };
     } finally {
       if (this.activeController === controller) {

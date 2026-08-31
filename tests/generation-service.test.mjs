@@ -43,14 +43,10 @@ test('builds bounded roleplay context without requesting a normal chat turn', ()
     promptTemplate: '生成调查 JSON',
     initialState: { target: '', conclusion: '' },
   };
-  const mofoData = {
-    getItemById: () => ({ state: { summary: '前情总结' } }),
-    getItems: () => [],
-  };
   const messages = buildGenerationMessages({
     context: { name1: '用户', name2: '柚月', chat: [{ is_user: true, mes: '调查林姐' }] },
     item,
-    mofoData,
+    memorySnapshot: { state: { summary: '前情总结' } },
     target: '林姐',
   });
   assert.equal(messages.length, 2);
@@ -69,7 +65,7 @@ test('uses an editable prompt, one-off instructions and the current dossier base
   const messages = buildGenerationMessages({
     context: { name1: '用户', name2: '角色', chat: [] },
     item,
-    mofoData: { getItemById: () => null, getItems: () => [] },
+    memorySnapshot: { state: {} },
     target: '林姐',
     promptOverride: '自定义完整提示词',
     extraInstructions: '侧重心理变化',
@@ -82,26 +78,16 @@ test('uses an editable prompt, one-off instructions and the current dossier base
   assert.match(messages[1].content, /旧档案/);
 });
 
-test('uses the official phone AI manager and saves generated state to Mofo', async (t) => {
-  const items = [{
+test('uses the official phone AI manager and saves generated state to native extension storage', async (t) => {
+  const item = {
     id: 'yssa_current_story_state',
     promptTemplate: '生成状态',
     initialState: { chapter: '', location: '' },
     state: { chapter: '旧章', location: '旧地' },
-  }];
-  const mofoData = {
-    getItems: () => structuredClone(items),
-    getItemById: (id) => structuredClone(items.find((item) => item.id === id) || null),
-    createItem() {},
-    updateItem(id, patch) {
-      const item = items.find((candidate) => candidate.id === id);
-      Object.assign(item, structuredClone(patch));
-      return structuredClone(item);
-    },
   };
+  let saved = null;
   const previous = globalThis.VirtualPhone;
   globalThis.VirtualPhone = {
-    cachedMofoData: mofoData,
     apiManager: {
       async callAI(messages, options) {
         assert.equal(options.appId, 'phone_online');
@@ -115,11 +101,18 @@ test('uses the official phone AI manager and saves generated state to Mofo', asy
     else globalThis.VirtualPhone = previous;
   });
 
-  const service = new GenerationService(() => ({ name1: '用户', name2: '角色', chat: [] }));
+  const service = new GenerationService({
+    getContext: () => ({ name1: '用户', name2: '角色', chat: [] }),
+    getItem: () => structuredClone(item),
+    saveState: (_toolId, state) => {
+      saved = structuredClone(state);
+      return { ...structuredClone(item), state: structuredClone(state) };
+    },
+    getMemorySnapshot: () => ({ state: { summary: '前情' } }),
+  });
   const result = await service.generate('yssa_current_story_state');
   assert.deepEqual(result.state, { chapter: '新章', location: '车站' });
-  assert.equal(items[0].state.chapter, '新章');
-  assert.equal(items[0].lastUpdatedBy, 'yuzuki-story-studio-ai');
+  assert.deepEqual(saved, { chapter: '新章', location: '车站' });
 });
 
 test('redacts API URLs and likely keys from displayed errors', () => {

@@ -46,30 +46,24 @@ export class SettingsUI {
     root.id = ROOT_ID;
     root.className = 'yssa-settings';
     root.setAttribute('aria-labelledby', 'yssa-addon-title');
-    const heading = addTextElement(root, 'h3', '', '柚月魔坊内容增量包');
+    const heading = addTextElement(root, 'h3', '', '柚月剧情工坊');
     heading.id = 'yssa-addon-title';
-    addTextElement(root, 'p', 'yssa-settings__summary', '向柚月手机添加“剧情工坊”完整 App；只有手动点击生成时才调用 AI，不写数据库，也不启用 MVU。');
+    addTextElement(root, 'p', 'yssa-settings__summary', '向柚月手机添加独立原生 App；内容按当前聊天保存在本扩展中，不使用数据库、MVU或魔坊。');
     this.statusNode = addTextElement(root, 'p', 'yssa-settings__status', '正在检测依赖…');
     this.statusNode.dataset.yssaStatus = '';
     this.statusNode.setAttribute('aria-live', 'polite');
 
     const actions = document.createElement('div');
     actions.className = 'yssa-settings__actions';
-    const install = addTextElement(actions, 'button', 'menu_button', '安装缺失模板');
-    install.type = 'button';
-    install.addEventListener('click', () => this.runAction(() => this.runtime.installMissing('settings')), { signal: this.abortController.signal });
     const open = addTextElement(actions, 'button', 'menu_button', '打开剧情工坊');
     open.type = 'button';
     open.addEventListener('click', () => this.openPhoneApp(), { signal: this.abortController.signal });
     const prompts = addTextElement(actions, 'button', 'menu_button', '编辑生成提示词');
     prompts.type = 'button';
     prompts.addEventListener('click', () => this.openPhoneApp('prompt-settings'), { signal: this.abortController.signal });
-    const refresh = addTextElement(actions, 'button', 'menu_button', '刷新记忆快照');
+    const refresh = addTextElement(actions, 'button', 'menu_button', '刷新柚月记忆');
     refresh.type = 'button';
     refresh.addEventListener('click', () => this.runAction(() => this.runtime.refreshMemory('settings')), { signal: this.abortController.signal });
-    const download = addTextElement(actions, 'button', 'menu_button', '下载魔坊导入包');
-    download.type = 'button';
-    download.addEventListener('click', () => this.downloadPack(), { signal: this.abortController.signal });
     root.appendChild(actions);
     container.appendChild(root);
     this.root = root;
@@ -90,32 +84,16 @@ export class SettingsUI {
     if (!this.statusNode || !status) return;
     const capabilities = [
       `手机${status.phoneReady ? '已连接' : '未连接'}`,
-      `魔坊${status.mofoReady ? '已连接' : '未连接'}`,
+      `原生状态${status.storageReady ? '已就绪' : '未就绪'}`,
       `记忆${status.memoryReady ? '已连接' : '未连接'}`,
     ].join(' · ');
     this.statusNode.textContent = `${capabilities}｜${status.message || ''}${status.lastSync ? `｜最近同步 ${status.lastSync}` : ''}`;
   }
 
-  async downloadPack() {
-    try {
-      const pack = await this.runtime.loadPack();
-      const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = '柚月魔坊内容增量包.json';
-      anchor.click();
-      URL.revokeObjectURL(url);
-      this.notify('魔坊导入包已下载。', 'success');
-    } catch (error) {
-      this.notify(`下载失败：${error.message}`, 'error');
-    }
-  }
-
   notify(message, type = 'info') {
     const toast = globalThis.toastr?.[type] || globalThis.toastr?.info;
-    if (typeof toast === 'function') toast(message, '柚月魔坊内容增量包');
-    else console.info(`[柚月魔坊内容增量包] ${message}`);
+    if (typeof toast === 'function') toast(message, '柚月剧情工坊');
+    else console.info(`[柚月剧情工坊] ${message}`);
   }
 
   stop() {

@@ -1,9 +1,9 @@
 {
-  "display_name": "柚月魔坊内容增量包",
+  "display_name": "柚月剧情工坊",
   "name": "yuzuki-story-state-addon",
-  "description": "为柚月手机添加康乃馨风格的剧情工坊 App，包含原状态栏玩法商店、V3.647 大调查、成就卡册和小红书信息流；不使用数据库或 MVU。",
+  "description": "为柚月手机添加独立原生剧情工坊 App，包含剧情状态、V3.647 大调查、成就卡册和社交笔记；状态由扩展按聊天保存，不使用数据库、MVU或魔坊。",
   "author": "keke / Codex",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "loading_order": 260,
   "minimum_client_version": "1.18.0",
   "js": "index.js",

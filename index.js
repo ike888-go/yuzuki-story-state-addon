@@ -2,7 +2,7 @@ import { ContentAddonRuntime } from './src/runtime.js';
 import { SettingsUI } from './src/settings-ui.js';
 import { StoryStudioPhoneApp, openStoryStudioApp } from './src/phone-studio-app.js';
 
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 
 let runtime = null;
 let settingsUI = null;
@@ -12,10 +12,8 @@ function exposeApi() {
   globalThis.YuzukiStoryStateAddon = Object.freeze({
     version: VERSION,
     getStatus: () => runtime?.getStatus() || null,
-    installMissing: () => runtime?.installMissing('public-api'),
     refreshMemory: () => runtime?.refreshMemory('public-api'),
-    getImportPack: () => runtime?.getImportPack() || null,
-    downloadImportPack: () => settingsUI?.downloadPack(),
+    getItem: (toolId) => runtime?.getGenerationItem(toolId) || null,
     openStudio: () => openStoryStudioApp(),
     generate: (toolId, options) => runtime?.generateTool(toolId, options),
     cancelGeneration: () => runtime?.cancelGeneration(),
@@ -34,7 +32,7 @@ export function onActivate() {
   phoneApp.start();
   exposeApi();
   runtime.start().catch((error) => {
-    console.error('[柚月魔坊内容增量包] 启动失败', error);
+    console.error('[柚月剧情工坊] 启动失败', error);
   });
 }
 
