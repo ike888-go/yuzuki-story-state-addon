@@ -16,29 +16,36 @@
       "id": "yuzuki-phone-runtime",
       "owner": "provider",
       "symbol": "window.VirtualPhone",
-      "required": false,
-      "fallback": "使用扩展自己的悬浮按钮和状态中心，不向柚月手机桌面添加图标。"
+      "required": true,
+      "fallback": null
     },
     {
-      "id": "yuzuki-phone-shell",
+      "id": "yuzuki-phone-mofo-data",
       "owner": "provider",
-      "symbol": "window.VirtualPhone.home.phoneShell.setContent",
+      "symbol": "window.VirtualPhone.cachedMofoData",
       "required": false,
-      "fallback": "在独立覆盖层中打开状态中心。"
+      "fallback": "保留内置魔坊 JSON 下载；打开一次柚月手机的魔坊后再自动安装。"
     },
     {
-      "id": "yuzuki-phone-ai",
+      "id": "yuzuki-memory-runtime",
       "owner": "provider",
-      "symbol": "window.VirtualPhone.apiManager.callAI",
-      "required": false,
-      "fallback": "大调查使用 SillyTavern.getContext().generateRaw。"
+      "symbol": "window.YuzukiMemory",
+      "required": true,
+      "fallback": null
     },
     {
-      "id": "yuzuki-memory-filter",
+      "id": "yuzuki-memory-storage",
       "owner": "provider",
-      "symbol": "window.YuzukiMemory.TaskRunner.filterContentByTags",
+      "symbol": "window.YuzukiMemory.Storage.loadState",
+      "required": true,
+      "fallback": null
+    },
+    {
+      "id": "yuzuki-memory-summary",
+      "owner": "provider",
+      "symbol": "window.YuzukiMemory.VariableInjector.buildSummaryText",
       "required": false,
-      "fallback": "只暴露只读记忆投影和更新事件，不直接写记忆插件内部数据。"
+      "fallback": "从记忆插件现有表格生成只读文本快照。"
     }
   ]
 }

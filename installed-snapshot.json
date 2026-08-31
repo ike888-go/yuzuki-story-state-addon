@@ -1,16 +1,22 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-08-31T00:00:00+08:00",
-  "target": "gaigai315/yuzuki-phone main",
+  "target": "gaigai315/yuzuki-phone@66a6453 + gaigai315/yuzuki-Memory@41795d5",
   "versions": {
     "sillytavern": "1.18.0",
     "tavernHelper": null,
-    "yuzuki-phone": "1.5.2"
+    "yuzuki-phone": "1.5.2",
+    "yuzuki-memory": "0.8.6"
   },
   "symbols": [
     "SillyTavern.getContext",
     "window.VirtualPhone",
-    "window.VirtualPhone.home.phoneShell.setContent",
-    "window.VirtualPhone.apiManager.callAI"
+    "window.VirtualPhone.cachedMofoData",
+    "window.VirtualPhone.mofoApp.mofoData",
+    "window.YuzukiMemory",
+    "window.YuzukiMemory.Storage.loadState",
+    "window.YuzukiMemory.Storage.getCurrentSessionId",
+    "window.YuzukiMemory.VariableInjector.buildSummaryText",
+    "window.YuzukiMemory.VariableInjector.createDefaultState"
   ]
 }

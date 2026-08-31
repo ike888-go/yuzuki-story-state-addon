@@ -1,21 +1,45 @@
-:root { --yssa-accent: #8167e8; --yssa-bg: #17151f; --yssa-card: rgba(255,255,255,.07); --yssa-text: #f5f2ff; --yssa-muted: #aaa3bc; }
-#yssa-floating-button { position: fixed; right: 18px; bottom: 92px; z-index: 29999; width: 46px; height: 46px; border: 1px solid rgba(255,255,255,.25); border-radius: 15px; background: linear-gradient(145deg,#9279f4,#5842af); box-shadow: 0 10px 30px rgba(51,35,111,.45); color: white; font-size: 23px; cursor: pointer; }
-.yssa-hidden { display: none !important; }
-.yssa-overlay { position: fixed; inset: 0; z-index: 30000; display: grid; place-items: center; padding: 16px; }
-.yssa-backdrop { position: absolute; inset: 0; background: rgba(8,7,12,.72); backdrop-filter: blur(8px); }
-.yssa-dialog { position: relative; width: min(760px,96vw); max-height: min(850px,92vh); overflow: hidden; border: 1px solid rgba(255,255,255,.15); border-radius: 22px; background: var(--yssa-bg); box-shadow: 0 30px 90px rgba(0,0,0,.55); color: var(--yssa-text); }
-.yssa-dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
-.yssa-dialog-head button { border: 0; background: transparent; color: inherit; font-size: 28px; cursor: pointer; }
-.yssa-overlay-content { max-height: calc(min(850px,92vh) - 50px); overflow: auto; }
-.yssa-root { box-sizing: border-box; min-height: 100%; padding: 16px; color: var(--yssa-text); background: radial-gradient(circle at 95% 0,rgba(129,103,232,.22),transparent 35%),var(--yssa-bg); font: 14px/1.45 system-ui,sans-serif; }
-.yssa-root * { box-sizing: border-box; }
-.yssa-hero { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; padding: 7px 3px 14px; }
-.yssa-hero h2 { margin: 2px 0; font-size: 23px; }.yssa-hero p { margin: 0; color: var(--yssa-muted); }.yssa-kicker { color: #bcaeff; font-size: 10px; letter-spacing: .16em; }.yssa-revision { padding: 5px 9px; border-radius: 99px; background: rgba(129,103,232,.2); color: #d6cdff; font-size: 11px; }
-.yssa-capabilities { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }.yssa-capabilities span { padding: 4px 8px; border-radius: 99px; background: rgba(255,255,255,.06); color: var(--yssa-muted); font-size: 11px; }.yssa-capabilities span.ok { background: rgba(66,190,139,.13); color: #88e3bd; }
-.yssa-tabs { display: flex; gap: 5px; overflow-x: auto; padding: 4px 0 10px; }.yssa-tabs button,.yssa-tools button,.yssa-person button,.yssa-survey-callout button { border: 1px solid rgba(255,255,255,.1); border-radius: 10px; padding: 7px 10px; background: rgba(255,255,255,.06); color: inherit; cursor: pointer; white-space: nowrap; }.yssa-tabs button.active { background: var(--yssa-accent); border-color: transparent; }
-.yssa-content { min-height: 250px; }.yssa-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }.yssa-card,.yssa-person,.yssa-row,.yssa-survey-callout { border: 1px solid rgba(255,255,255,.09); border-radius: 14px; padding: 12px; background: var(--yssa-card); }.yssa-card.primary { background: linear-gradient(145deg,rgba(129,103,232,.28),rgba(255,255,255,.05)); }.yssa-card.wide { grid-column: 1/-1; }.yssa-card span,.yssa-person small,.yssa-row small { display: block; color: var(--yssa-muted); font-size: 11px; }.yssa-card strong { display: block; margin: 4px 0; font-size: 19px; }.yssa-card p,.yssa-row p,.yssa-person p { margin: 5px 0 0; }.yssa-card pre,.yssa-person pre { max-height: 170px; overflow: auto; margin: 9px 0 0; white-space: pre-wrap; color: #d9d4e5; font: 11px/1.4 ui-monospace,monospace; }
-.yssa-list { display: grid; gap: 8px; }.yssa-person-head,.yssa-row,.yssa-survey-callout { display: flex; align-items: center; justify-content: space-between; gap: 12px; }.yssa-row { align-items: flex-start; }.yssa-row p { max-width: 60%; color: #d5d0dd; }.yssa-person details { margin-top: 8px; color: var(--yssa-muted); }.yssa-person button,.yssa-survey-callout button { background: rgba(129,103,232,.25); }
-.yssa-timeline { border-left: 1px solid rgba(129,103,232,.5); margin-left: 8px; padding-left: 16px; }.yssa-timeline article { position: relative; padding: 0 0 16px; }.yssa-timeline article::before { content: ''; position: absolute; left: -21px; top: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--yssa-accent); }.yssa-timeline time { display: block; color: var(--yssa-muted); font-size: 10px; }.yssa-timeline strong { display: block; }.yssa-timeline p { margin: 3px 0; }
-.yssa-survey-callout { margin-bottom: 14px; background: linear-gradient(145deg,rgba(129,103,232,.2),rgba(255,255,255,.04)); }.yssa-survey-callout p { margin: 2px 0; color: var(--yssa-muted); }.yssa-survey-callout select { max-width: 150px; padding: 7px; border-radius: 8px; background: #2a2635; color: white; }
-.yssa-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }.yssa-tools .danger { color: #ffaaa9; }.yssa-file { display: none; }.yssa-empty { display: grid; min-height: 230px; place-items: center; padding: 28px; color: var(--yssa-muted); text-align: center; }.yssa-error { margin-top: 10px; padding: 9px; border-radius: 8px; background: rgba(218,74,73,.15); color: #ffb6b4; }
-@media (max-width: 520px) { .yssa-root { padding: 12px; }.yssa-grid { grid-template-columns: 1fr; }.yssa-card.wide { grid-column: auto; }.yssa-survey-callout { align-items: stretch; flex-direction: column; }.yssa-survey-callout select { max-width: none; }.yssa-row { display: block; }.yssa-row p { max-width: none; } }
+#yssa-addon-settings {
+  --yssa-accent: #8c72df;
+  margin: 12px 0;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--yssa-accent) 35%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #222) 88%, var(--yssa-accent));
+}
+
+#yssa-addon-settings h3 {
+  margin: 0 0 6px;
+}
+
+.yssa-settings__summary,
+.yssa-settings__status {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+
+.yssa-settings__summary {
+  opacity: 0.82;
+}
+
+.yssa-settings__status {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--yssa-accent) 13%, transparent);
+}
+
+.yssa-settings__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.yssa-settings__actions button {
+  min-height: 40px;
+}
+
+@media (max-width: 480px) {
+  .yssa-settings__actions button {
+    flex: 1 1 100%;
+  }
+}

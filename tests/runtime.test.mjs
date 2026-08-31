@@ -1,77 +1,107 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { EXTENSION_KEY, StoryStateRuntime } from '../src/runtime.js';
+import { readFile } from 'node:fs/promises';
+import { ContentAddonRuntime, EXTENSION_KEY } from '../src/runtime.js';
 
-test('captures a reply patch, scrubs the tag and persists chat metadata', async (t) => {
+const pack = JSON.parse(await readFile(new URL('../packs/yuzuki-mofo-content-pack.json', import.meta.url), 'utf8'));
+
+function fakeMofo() {
+  const items = [];
+  return {
+    getItems: () => structuredClone(items),
+    getItemById: (id) => structuredClone(items.find((item) => item.id === id) || null),
+    createItem(input) { items.push(structuredClone(input)); return structuredClone(input); },
+    updateItem(id, patch) {
+      const item = items.find((candidate) => candidate.id === id);
+      if (!item) return null;
+      Object.assign(item, structuredClone(patch));
+      return structuredClone(item);
+    },
+  };
+}
+
+test('installs the pack and syncs memory without prompts or AI calls', async (t) => {
   const emitter = new EventEmitter();
-  const prompts = [];
+  const mofo = fakeMofo();
+  let promptCalls = 0;
+  let aiCalls = 0;
   const context = {
-    chat: [],
-    chatId: 'test-chat',
-    chatMetadata: {},
     extensionSettings: {},
     eventSource: emitter,
-    eventTypes: {
-      MESSAGE_RECEIVED: 'message_received', MESSAGE_EDITED: 'message_edited', MESSAGE_SWIPED: 'message_swiped',
-      MESSAGE_DELETED: 'message_deleted', CHAT_CHANGED: 'chat_changed',
-      MESSAGE_SWIPE_DELETED: 'message_swipe_deleted',
-    },
+    eventTypes: { APP_READY: 'ready', CHAT_CHANGED: 'chat', MESSAGE_RECEIVED: 'message' },
     saveSettingsDebounced() {},
-    async saveChat() {},
-    async updateMessageBlock() {},
-    setExtensionPrompt(...args) { prompts.push(args); },
+    setExtensionPrompt() { promptCalls += 1; },
+  };
+  const previous = {
+    SillyTavern: globalThis.SillyTavern,
+    VirtualPhone: globalThis.VirtualPhone,
+    YuzukiMemory: globalThis.YuzukiMemory,
+    fetch: globalThis.fetch,
+    CustomEvent: globalThis.CustomEvent,
+    dispatchEvent: globalThis.dispatchEvent,
   };
   globalThis.SillyTavern = { getContext: () => context };
+  globalThis.VirtualPhone = { cachedMofoData: mofo, apiManager: { callAI() { aiCalls += 1; } } };
+  globalThis.YuzukiMemory = {
+    Storage: { getCurrentSessionId: () => 'chat-1', loadState: () => ({ records: { memory_summary: [] } }) },
+    VariableInjector: { createDefaultState: () => ({ records: {} }), buildSummaryText: () => '测试总结' },
+  };
+  globalThis.fetch = async () => ({ ok: true, json: async () => structuredClone(pack) });
   globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
   globalThis.dispatchEvent = () => true;
   t.after(() => {
-    delete globalThis.SillyTavern;
-    delete globalThis.CustomEvent;
-    delete globalThis.dispatchEvent;
+    Object.entries(previous).forEach(([key, value]) => {
+      if (value === undefined) delete globalThis[key];
+      else globalThis[key] = value;
+    });
   });
 
-  const runtime = new StoryStateRuntime();
+  const runtime = new ContentAddonRuntime();
   await runtime.start();
-  context.chat.push({
-    is_user: false,
-    mes: '她走进雨里。\n<YUZUKI_STATE_PATCH>{"schemaVersion":1,"set":{"scene.weather":"雨"}}</YUZUKI_STATE_PATCH>',
-    swipe_id: 0,
-    swipes: ['她走进雨里。\n<YUZUKI_STATE_PATCH>{"schemaVersion":1,"set":{"scene.weather":"雨"}}</YUZUKI_STATE_PATCH>'],
-  });
-  await runtime.processMessage(0, 'received');
-
-  assert.equal(runtime.getState().scene.weather, '雨');
-  assert.equal(context.chat[0].mes, '她走进雨里。');
-  assert.ok(context.chatMetadata[EXTENSION_KEY].messagePatches['0:0']);
-  assert.match(prompts.at(-1)[1], /YUZUKI_STATE_PATCH/);
+  assert.equal(mofo.getItems().length, 5);
+  assert.equal(mofo.getItemById('yssa_memory_snapshot').state.summary, '测试总结');
+  assert.equal(context.extensionSettings[EXTENSION_KEY].packRevision, 1);
+  assert.equal(promptCalls, 0);
+  assert.equal(aiCalls, 0);
   runtime.stop();
 });
 
-test('reindexes patch records after a message is deleted', async (t) => {
+test('does not recreate user-deleted templates after the content revision was installed', async (t) => {
   const emitter = new EventEmitter();
+  const mofo = fakeMofo();
   const context = {
-    chat: [
-      { is_user: false, mes: '第一条', swipe_id: 0, swipes: ['第一条'], extra: { [EXTENSION_KEY]: { swipes: { 0: 'record-a' } } } },
-      { is_user: false, mes: '第二条', swipe_id: 0, swipes: ['第二条'], extra: { [EXTENSION_KEY]: { swipes: { 0: 'record-b' } } } },
-    ],
-    chatMetadata: { [EXTENSION_KEY]: { messagePatches: {
-      '0:0': { id: 'record-a', patches: [{ set: { 'scene.location': 'A' } }] },
-      '1:0': { id: 'record-b', patches: [{ set: { 'scene.location': 'B' } }] },
-    } } },
-    extensionSettings: {}, eventSource: emitter,
-    eventTypes: { MESSAGE_DELETED: 'deleted' },
-    saveSettingsDebounced() {}, async saveChat() {}, setExtensionPrompt() {},
+    extensionSettings: { [EXTENSION_KEY]: { autoInstall: true, memorySync: true, packRevision: 1 } },
+    eventSource: emitter,
+    eventTypes: {},
+    saveSettingsDebounced() {},
+  };
+  const previous = {
+    SillyTavern: globalThis.SillyTavern,
+    VirtualPhone: globalThis.VirtualPhone,
+    YuzukiMemory: globalThis.YuzukiMemory,
+    fetch: globalThis.fetch,
+    CustomEvent: globalThis.CustomEvent,
+    dispatchEvent: globalThis.dispatchEvent,
   };
   globalThis.SillyTavern = { getContext: () => context };
+  globalThis.VirtualPhone = { cachedMofoData: mofo };
+  globalThis.YuzukiMemory = {
+    Storage: { getCurrentSessionId: () => 'chat-1', loadState: () => ({ records: {} }) },
+    VariableInjector: { createDefaultState: () => ({ records: {} }), buildSummaryText: () => '' },
+  };
+  globalThis.fetch = async () => ({ ok: true, json: async () => structuredClone(pack) });
   globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
   globalThis.dispatchEvent = () => true;
-  t.after(() => { delete globalThis.SillyTavern; delete globalThis.CustomEvent; delete globalThis.dispatchEvent; });
-  const runtime = new StoryStateRuntime();
+  t.after(() => {
+    Object.entries(previous).forEach(([key, value]) => {
+      if (value === undefined) delete globalThis[key];
+      else globalThis[key] = value;
+    });
+  });
+
+  const runtime = new ContentAddonRuntime();
   await runtime.start();
-  context.chat.splice(0, 1);
-  await runtime.reload('deleted', true);
-  assert.equal(runtime.root.messagePatches['0:0'].id, 'record-b');
-  assert.equal(runtime.getState().scene.location, 'B');
+  assert.equal(mofo.getItems().length, 0);
   runtime.stop();
 });

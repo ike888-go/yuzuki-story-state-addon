@@ -1,45 +1,45 @@
-import { StoryStateRuntime } from './src/runtime.js';
-import { StoryStateUI } from './src/ui.js';
+import { ContentAddonRuntime } from './src/runtime.js';
+import { SettingsUI } from './src/settings-ui.js';
 
-let runtime;
-let ui;
+const VERSION = '0.2.0';
+
+let runtime = null;
+let settingsUI = null;
 
 function exposeApi() {
   globalThis.YuzukiStoryStateAddon = Object.freeze({
-    version: '0.1.0',
-    getState: () => runtime?.getState(),
-    getMemoryProjection: () => runtime?.getMemoryProjection(),
-    applyPatch: (patch, source) => runtime?.applyManualPatch(patch, source),
-    importLegacy: (data) => runtime?.importLegacy(data),
-    exportData: () => runtime?.exportData(),
-    open: () => ui?.open(),
+    version: VERSION,
+    getStatus: () => runtime?.getStatus() || null,
+    installMissing: () => runtime?.installMissing('public-api'),
+    refreshMemory: () => runtime?.refreshMemory('public-api'),
+    getImportPack: () => runtime?.getImportPack() || null,
+    downloadImportPack: () => settingsUI?.downloadPack(),
   });
 }
 
-export async function onActivate() {
+export function onActivate() {
   if (runtime) return;
-  runtime = new StoryStateRuntime(() => ui?.rerender());
-  await runtime.start();
-  ui = new StoryStateUI(runtime);
-  ui.start();
+  runtime = new ContentAddonRuntime((status) => settingsUI?.renderStatus(status));
+  settingsUI = new SettingsUI(runtime);
+  settingsUI.start();
   exposeApi();
+  runtime.start().catch((error) => {
+    console.error('[柚月魔坊内容增量包] 启动失败', error);
+  });
 }
 
-export async function onEnable() {
-  await onActivate();
-  await runtime.setSetting('enabled', true);
+export function onEnable() {
+  onActivate();
 }
 
-export async function onDisable() {
-  if (!runtime) return;
-  await runtime.setSetting('enabled', false);
-  ui?.stop();
-  runtime.stop();
-  ui = null;
+export function onDisable() {
+  runtime?.stop();
+  settingsUI?.stop();
+  settingsUI = null;
   runtime = null;
   delete globalThis.YuzukiStoryStateAddon;
 }
 
-export async function onClean() {
-  await onDisable();
+export function onClean() {
+  onDisable();
 }
