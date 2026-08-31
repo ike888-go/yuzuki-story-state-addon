@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "minimum": {
+    "sillytavern": "1.18.0",
+    "tavernHelper": null
+  },
+  "requirements": [
+    {
+      "id": "host-context",
+      "owner": "sillytavern",
+      "symbol": "SillyTavern.getContext",
+      "required": true,
+      "fallback": null
+    },
+    {
+      "id": "yuzuki-phone-runtime",
+      "owner": "provider",
+      "symbol": "window.VirtualPhone",
+      "required": false,
+      "fallback": "使用扩展自己的悬浮按钮和状态中心，不向柚月手机桌面添加图标。"
+    },
+    {
+      "id": "yuzuki-phone-shell",
+      "owner": "provider",
+      "symbol": "window.VirtualPhone.home.phoneShell.setContent",
+      "required": false,
+      "fallback": "在独立覆盖层中打开状态中心。"
+    },
+    {
+      "id": "yuzuki-phone-ai",
+      "owner": "provider",
+      "symbol": "window.VirtualPhone.apiManager.callAI",
+      "required": false,
+      "fallback": "大调查使用 SillyTavern.getContext().generateRaw。"
+    },
+    {
+      "id": "yuzuki-memory-filter",
+      "owner": "provider",
+      "symbol": "window.YuzukiMemory.TaskRunner.filterContentByTags",
+      "required": false,
+      "fallback": "只暴露只读记忆投影和更新事件，不直接写记忆插件内部数据。"
+    }
+  ]
+}
