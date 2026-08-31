@@ -1,9 +1,9 @@
 {
-  "display_name": "柚月剧情工坊",
+  "display_name": "柚月剧情扩展桌面",
   "name": "yuzuki-story-state-addon",
-  "description": "为柚月手机添加独立原生剧情工坊 App，包含剧情状态、V3.647 大调查、成就卡册和社交笔记；状态由扩展按聊天保存，不使用数据库、MVU或魔坊。",
+  "description": "为柚月手机添加可分页的扩展桌面；剧情状态、V3.647 大调查、成就册和小红书均为独立 App，不使用数据库、MVU或魔坊。",
   "author": "keke / Codex",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "loading_order": 260,
   "minimum_client_version": "1.18.0",
   "js": "index.js",

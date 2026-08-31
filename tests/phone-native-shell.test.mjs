@@ -4,10 +4,11 @@ import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('../src/phone-studio-app.js', import.meta.url), 'utf8');
 
-test('opens directly into one native Yuzuki app shell', () => {
+test('opens each feature as an independent native Yuzuki app without a shared navbar', () => {
   assert.match(source, /yssa-native-header/);
-  assert.match(source, /yssa-native-tabbar/);
-  assert.match(source, /'yssa-story-studio-main'/);
+  assert.match(source, /YUZUKI_EXTENSION_APPS/);
+  assert.match(source, /`yssa-native-\$\{tool\.key\}`/);
+  assert.doesNotMatch(source, /yssa-native-tabbar|toolTabbar|TOOL_NAV/);
   assert.doesNotMatch(source, /renderHome|yssa-studio-home|yssa-home-clock/);
 });
 

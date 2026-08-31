@@ -46,18 +46,18 @@ export class SettingsUI {
     root.id = ROOT_ID;
     root.className = 'yssa-settings';
     root.setAttribute('aria-labelledby', 'yssa-addon-title');
-    const heading = addTextElement(root, 'h3', '', '柚月剧情工坊');
+    const heading = addTextElement(root, 'h3', '', '柚月剧情扩展');
     heading.id = 'yssa-addon-title';
-    addTextElement(root, 'p', 'yssa-settings__summary', '向柚月手机添加独立原生 App；内容按当前聊天保存在本扩展中，不使用数据库、MVU或魔坊。');
+    addTextElement(root, 'p', 'yssa-settings__summary', '在柚月手机第二页添加独立 App；每 12 个自动新增一页，不使用数据库、MVU或魔坊。');
     this.statusNode = addTextElement(root, 'p', 'yssa-settings__status', '正在检测依赖…');
     this.statusNode.dataset.yssaStatus = '';
     this.statusNode.setAttribute('aria-live', 'polite');
 
     const actions = document.createElement('div');
     actions.className = 'yssa-settings__actions';
-    const open = addTextElement(actions, 'button', 'menu_button', '打开剧情工坊');
+    const open = addTextElement(actions, 'button', 'menu_button', '打开扩展桌面');
     open.type = 'button';
-    open.addEventListener('click', () => this.openPhoneApp(), { signal: this.abortController.signal });
+    open.addEventListener('click', () => this.openPhoneApp('desktop'), { signal: this.abortController.signal });
     const prompts = addTextElement(actions, 'button', 'menu_button', '编辑生成提示词');
     prompts.type = 'button';
     prompts.addEventListener('click', () => this.openPhoneApp('prompt-settings'), { signal: this.abortController.signal });
@@ -92,8 +92,8 @@ export class SettingsUI {
 
   notify(message, type = 'info') {
     const toast = globalThis.toastr?.[type] || globalThis.toastr?.info;
-    if (typeof toast === 'function') toast(message, '柚月剧情工坊');
-    else console.info(`[柚月剧情工坊] ${message}`);
+    if (typeof toast === 'function') toast(message, '柚月剧情扩展');
+    else console.info(`[柚月剧情扩展] ${message}`);
   }
 
   stop() {

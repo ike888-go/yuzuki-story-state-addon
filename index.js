@@ -2,7 +2,7 @@ import { ContentAddonRuntime } from './src/runtime.js';
 import { SettingsUI } from './src/settings-ui.js';
 import { StoryStudioPhoneApp, openStoryStudioApp } from './src/phone-studio-app.js';
 
-const VERSION = '0.6.0';
+const VERSION = '0.7.0';
 
 let runtime = null;
 let settingsUI = null;
@@ -14,7 +14,7 @@ function exposeApi() {
     getStatus: () => runtime?.getStatus() || null,
     refreshMemory: () => runtime?.refreshMemory('public-api'),
     getItem: (toolId) => runtime?.getGenerationItem(toolId) || null,
-    openStudio: () => openStoryStudioApp(),
+    openStudio: () => phoneApp?.openFromSettings('desktop') || openStoryStudioApp(),
     generate: (toolId, options) => runtime?.generateTool(toolId, options),
     cancelGeneration: () => runtime?.cancelGeneration(),
   });

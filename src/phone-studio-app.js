@@ -1,18 +1,10 @@
 import { GENERATION_TOOLS, sanitizeGenerationError } from './generation-service.js';
 import { normalizeSocialState, renderToolState } from './studio-views.js';
+import { PhoneHomePager, YUZUKI_EXTENSION_APPS } from './phone-home-pager.js';
 
-const APP_ID = 'yssa-story-studio';
 const DEFAULT_TOOL_ID = GENERATION_TOOLS[0].id;
-const APP_ICON = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7768e5"/><stop offset="1" stop-color="#4f9ee8"/></linearGradient></defs><rect width="128" height="128" rx="30" fill="url(#g)"/><path d="M34 31c14-5 25-1 30 8 7-10 18-12 30-7v57c-13-4-23 0-30 9-8-9-18-13-30-9V31Z" fill="none" stroke="#fff" stroke-width="7"/><path d="M64 40v58M87 20l3 8 8 3-8 3-3 8-3-8-8-3 8-3 3-8Z" fill="#fff"/></svg>`)} `;
-const APP_DESCRIPTOR = Object.freeze({ id: APP_ID, name: '剧情工坊', icon: '✦', defaultIcon: APP_ICON.trim(), color: '#5b78df', badge: 0, data: {} });
-
-const TOOL_NAV = Object.freeze({
-  story: { label: '剧情', icon: 'fa-compass' },
-  investigation: { label: '调查', icon: 'fa-user-secret' },
-  achievements: { label: '成就', icon: 'fa-trophy' },
-  social: { label: '笔记', icon: 'fa-note-sticky' },
-});
+const APP_BY_ID = new Map(YUZUKI_EXTENSION_APPS.map((app) => [app.id, app]));
+const APP_BY_TOOL_ID = new Map(YUZUKI_EXTENSION_APPS.map((app) => [app.toolId, app]));
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -35,6 +27,7 @@ export class StoryStudioPhoneApp {
     this.promptToolId = DEFAULT_TOOL_ID;
     this.socialPostId = '';
     this.lastChatKey = '';
+    this.homePager = new PhoneHomePager({ apps: YUZUKI_EXTENSION_APPS });
   }
 
   start() {
@@ -43,12 +36,13 @@ export class StoryStudioPhoneApp {
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
     window.addEventListener('phone:openApp', (event) => {
-      if (event?.detail?.appId !== APP_ID) return;
+      const app = APP_BY_ID.get(event?.detail?.appId);
+      if (!app) return;
       event.stopImmediatePropagation();
       queueMicrotask(() => {
         const view = this.pendingView;
         this.pendingView = DEFAULT_TOOL_ID;
-        this.open(view);
+        this.open(view === 'prompt-settings' ? view : app.toolId);
       });
     }, { signal, capture: true });
     window.addEventListener('phone:panelVisibility', () => this.scheduleRegister(0, true), { signal });
@@ -63,7 +57,7 @@ export class StoryStudioPhoneApp {
     this.abortController?.abort();
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = null;
-    this.removeDescriptor();
+    this.homePager.detach();
     document.querySelector('.yssa-phone-app')?.remove();
     this.active = false;
     this.busy = false;
@@ -88,50 +82,51 @@ export class StoryStudioPhoneApp {
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
       this.registerAttempts += 1;
-      if (!this.registerDescriptor()) this.scheduleRegister(1200);
+      if (!this.registerDesktop()) this.scheduleRegister(1200);
     }, delay);
   }
 
-  registerDescriptor() {
+  registerDesktop() {
     const home = window.VirtualPhone?.home;
     if (!home || !Array.isArray(home.apps) || !home.phoneShell?.setContent) return false;
-    if (!home.apps.some((app) => app?.id === APP_ID)) home.apps.push({ ...APP_DESCRIPTOR });
+    if (!this.homePager.attach(home)) return false;
     this.registerAttempts = 0;
-    if (home.isHomeScreenVisible?.()) home.render({ forceDomRefresh: true });
+    if (home.isHomeScreenVisible?.()) this.homePager.mount();
     return true;
-  }
-
-  removeDescriptor() {
-    const home = window.VirtualPhone?.home;
-    if (!Array.isArray(home?.apps)) return;
-    const index = home.apps.findIndex((app) => app?.id === APP_ID);
-    if (index >= 0) home.apps.splice(index, 1);
-    try { window.VirtualPhone?.storage?.saveApps?.(home.apps); } catch (_error) {}
-    if (home.isHomeScreenVisible?.()) home.render({ forceDomRefresh: true });
   }
 
   open(view = DEFAULT_TOOL_ID) {
     if (!this.active) return;
     try {
-      this.registerDescriptor();
+      this.registerDesktop();
       if (!this.getShell()?.setContent) return;
       if (view === 'prompt-settings') this.renderPromptSettings(this.promptToolId);
-      else this.renderTool(toolById(view)?.id || this.currentToolId || DEFAULT_TOOL_ID);
+      else {
+        const appToolId = APP_BY_ID.get(view)?.toolId;
+        this.renderTool(toolById(appToolId || view)?.id || this.currentToolId || DEFAULT_TOOL_ID);
+      }
     } catch (error) {
       console.error('[柚月剧情工坊] 打开页面失败', error);
     }
   }
 
-  openFromSettings(view = DEFAULT_TOOL_ID) {
-    if (!this.registerDescriptor() || !this.getShell()?.setContent) {
-      window.toastr?.info?.('请先打开一次柚月手机，再点击“剧情工坊”图标。', '柚月剧情工坊');
+  openFromSettings(view = 'desktop') {
+    if (!this.registerDesktop() || !this.getShell()?.setContent) {
+      window.toastr?.info?.('请先打开一次柚月手机，再进入扩展桌面。', '柚月剧情扩展');
       return false;
     }
     const panel = document.getElementById('phone-panel');
     const panelIsOpen = panel?.classList.contains('phone-panel-open') && !panel?.classList.contains('phone-panel-hidden');
     if (!panelIsOpen) document.getElementById('phoneDrawerIcon')?.click?.();
-    this.pendingView = view;
-    setTimeout(() => window.dispatchEvent(new CustomEvent('phone:openApp', { detail: { appId: APP_ID } })), panelIsOpen ? 0 : 120);
+    setTimeout(() => {
+      if (view === 'desktop') {
+        this.homePager.showExtensionPage();
+        return;
+      }
+      this.pendingView = view;
+      const app = APP_BY_TOOL_ID.get(view) || APP_BY_TOOL_ID.get(this.currentToolId) || APP_BY_TOOL_ID.get(DEFAULT_TOOL_ID);
+      window.dispatchEvent(new CustomEvent('phone:openApp', { detail: { appId: app.id } }));
+    }, panelIsOpen ? 0 : 120);
     return true;
   }
 
@@ -150,18 +145,10 @@ export class StoryStudioPhoneApp {
 
   header(title, { promptSettings = false } = {}) {
     return `<header class="yssa-native-header">
-      <div class="yssa-native-header-left"><button type="button" class="yssa-native-header-button" data-yssa-action="${promptSettings ? 'back-tool' : 'phone-home'}" aria-label="${promptSettings ? '返回剧情工坊' : '返回柚月桌面'}"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button></div>
+      <div class="yssa-native-header-left"><button type="button" class="yssa-native-header-button" data-yssa-action="${promptSettings ? 'back-tool' : 'phone-home'}" aria-label="${promptSettings ? '返回当前 App' : '返回柚月桌面'}"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button></div>
       <div class="yssa-native-header-title"><strong>${escapeHtml(title)}</strong><span class="yssa-connection-dot" data-yssa-connection aria-label="连接状态"></span></div>
       <div class="yssa-native-header-right">${promptSettings ? '' : '<button type="button" class="yssa-native-header-button" data-yssa-action="refresh-memory" aria-label="刷新记忆"><i class="fa-solid fa-rotate" aria-hidden="true"></i></button><button type="button" class="yssa-native-header-button" data-yssa-action="settings" aria-label="提示词设置"><i class="fa-solid fa-gear" aria-hidden="true"></i></button>'}</div>
     </header>`;
-  }
-
-  toolTabbar(activeToolId) {
-    return `<nav class="yssa-native-tabbar" aria-label="剧情工坊主要功能">${GENERATION_TOOLS.map((tool) => {
-      const active = tool.id === activeToolId;
-      const nav = TOOL_NAV[tool.key];
-      return `<button type="button" class="yssa-native-tab${active ? ' is-active' : ''}" data-yssa-tool="${tool.id}" ${active ? 'aria-current="page"' : ''}><i class="fa-solid ${nav.icon}" aria-hidden="true"></i><span>${nav.label}</span></button>`;
-    }).join('')}</nav>`;
   }
 
   renderTool(toolId) {
@@ -176,12 +163,10 @@ export class StoryStudioPhoneApp {
       ${this.header(tool.name)}
       <div class="yssa-tool-scroll"><section class="yssa-tool-canvas" data-yssa-result>${renderToolState(tool.key, state, this.socialPostId)}</section>${investigationControls}<section class="yssa-generation-status" data-yssa-generation-status data-mode="idle"><span></span><div><strong>准备就绪</strong><p>数据由本扩展按当前聊天保存，只在点击时调用 AI。</p></div></section></div>
       <div class="yssa-native-actionbar"><button data-yssa-action="edit-prompt" aria-label="编辑当前提示词"><i class="fa-solid fa-pen" aria-hidden="true"></i></button><button class="yssa-stop-button" data-yssa-action="stop" hidden>停止</button><button class="yssa-generate-button" data-yssa-action="generate" data-yssa-idle-label="${actionLabel}"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>${actionLabel}</span></button></div>
-      ${this.toolTabbar(tool.id)}
-    </main>`, 'yssa-story-studio-main');
+    </main>`, `yssa-native-${tool.key}`);
     if (!root) return;
     this.bindCommon(root);
     this.bindToolInteractions(root, tool, state);
-    root.querySelectorAll('.yssa-native-tab[data-yssa-tool]').forEach((button) => button.addEventListener('click', () => this.renderTool(button.dataset.yssaTool)));
     root.querySelector('[data-yssa-action="generate"]')?.addEventListener('click', () => this.generate(tool.id));
     root.querySelector('[data-yssa-action="stop"]')?.addEventListener('click', () => this.runtime.cancelGeneration());
     this.populateTargets(root);
@@ -222,7 +207,7 @@ export class StoryStudioPhoneApp {
     this.promptToolId = selected.id;
     const tabs = GENERATION_TOOLS.map((tool) => `<button class="${tool.id === selected.id ? 'is-active' : ''}" data-yssa-prompt-tool="${tool.id}"><span>${tool.icon}</span><strong>${tool.name}</strong></button>`).join('');
     const root = this.setContent(`<main class="yssa-phone-app yssa-native-app yssa-prompt-settings">${this.header('提示词设置', { promptSettings: true })}
-      <div class="yssa-tool-scroll"><section class="yssa-prompt-notice"><strong>每个栏目单独设置</strong><p>只影响剧情工坊的手动生成，不改柚月手机和记忆插件。</p></section><nav class="yssa-prompt-tabs">${tabs}</nav><section class="yssa-prompt-editor"><div><small>${selected.eyebrow}</small><h2>${selected.name}</h2><span data-yssa-prompt-mode></span></div><textarea data-yssa-prompt-text maxlength="32000" spellcheck="false"></textarea><p><span data-yssa-prompt-count>0</span> / 32000 字符</p><footer><button data-yssa-action="reset-prompt">恢复默认</button><button class="is-primary" data-yssa-action="save-prompt">保存</button></footer></section><button class="yssa-reset-all" data-yssa-action="reset-all-prompts">恢复全部默认提示词</button><p data-yssa-prompt-feedback></p></div>
+      <div class="yssa-tool-scroll"><section class="yssa-prompt-notice"><strong>每个 App 单独设置</strong><p>只影响扩展 App 的手动生成，不改柚月手机和记忆插件。</p></section><nav class="yssa-prompt-tabs">${tabs}</nav><section class="yssa-prompt-editor"><div><small>${selected.eyebrow}</small><h2>${selected.name}</h2><span data-yssa-prompt-mode></span></div><textarea data-yssa-prompt-text maxlength="32000" spellcheck="false"></textarea><p><span data-yssa-prompt-count>0</span> / 32000 字符</p><footer><button data-yssa-action="reset-prompt">恢复默认</button><button class="is-primary" data-yssa-action="save-prompt">保存</button></footer></section><button class="yssa-reset-all" data-yssa-action="reset-all-prompts">恢复全部默认提示词</button><p data-yssa-prompt-feedback></p></div>
     </main>`, 'yssa-story-studio-prompt-settings');
     if (!root) return;
     this.bindCommon(root);
@@ -348,5 +333,5 @@ export class StoryStudioPhoneApp {
 }
 
 export function openStoryStudioApp() {
-  window.dispatchEvent(new CustomEvent('phone:openApp', { detail: { appId: APP_ID } }));
+  window.dispatchEvent(new CustomEvent('phone:openApp', { detail: { appId: APP_BY_TOOL_ID.get(DEFAULT_TOOL_ID).id } }));
 }

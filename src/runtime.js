@@ -224,7 +224,7 @@ export class ContentAddonRuntime {
     if (ready) {
       this.phoneRetryIndex = 0;
       this.phoneRetryTimer = null;
-      this.setStatus({ phoneReady: true, message: this.memorySnapshot.available ? '剧情工坊原生 App 与柚月记忆均已连接。' : '剧情工坊原生 App 已就绪，等待柚月记忆插件。' });
+      this.setStatus({ phoneReady: true, message: this.memorySnapshot.available ? '扩展桌面 App 与柚月记忆均已连接。' : '扩展桌面 App 已就绪，等待柚月记忆插件。' });
       return;
     }
     if (this.phoneRetryIndex >= PHONE_RETRY_DELAYS.length) {
