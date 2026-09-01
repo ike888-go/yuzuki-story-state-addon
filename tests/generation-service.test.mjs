@@ -42,6 +42,7 @@ test('builds bounded roleplay context without requesting a normal chat turn', ()
     id: 'yssa_investigation_report',
     promptTemplate: '生成调查 JSON',
     initialState: { target: '', conclusion: '' },
+    outputContract: { target: '姓名', conclusion: '结论' },
   };
   const messages = buildGenerationMessages({
     context: { name1: '用户', name2: '柚月', chat: [{ is_user: true, mes: '调查林姐' }] },
@@ -51,6 +52,7 @@ test('builds bounded roleplay context without requesting a normal chat turn', ()
   });
   assert.equal(messages.length, 2);
   assert.match(messages[0].content, /只返回一个 JSON 对象/);
+  assert.match(messages[0].content, /完整输出契约/);
   assert.match(messages[1].content, /指定调查对象：林姐/);
   assert.match(messages[1].content, /调查林姐/);
 });
@@ -60,6 +62,7 @@ test('uses an editable prompt, one-off instructions and the current dossier base
     id: 'yssa_investigation_report',
     promptTemplate: '默认提示词',
     initialState: { target: '', portrait: '' },
+    outputContract: { target: '姓名', portrait: '档案' },
     state: { target: '林姐', portrait: '旧档案' },
   };
   const messages = buildGenerationMessages({
@@ -74,7 +77,8 @@ test('uses an editable prompt, one-off instructions and the current dossier base
   assert.match(messages[1].content, /自定义完整提示词/);
   assert.doesNotMatch(messages[1].content, /任务：默认提示词/);
   assert.match(messages[1].content, /侧重心理变化/);
-  assert.match(messages[1].content, /当前档案基线/);
+  assert.match(messages[1].content, /当前 App 已保存数据/);
+  assert.match(messages[1].content, /续查模式/);
   assert.match(messages[1].content, /旧档案/);
 });
 
@@ -83,6 +87,7 @@ test('uses the official phone AI manager and saves generated state to native ext
     id: 'yssa_current_story_state',
     promptTemplate: '生成状态',
     initialState: { chapter: '', location: '' },
+    outputContract: { chapter: '章节', location: '地点' },
     state: { chapter: '旧章', location: '旧地' },
   };
   let saved = null;

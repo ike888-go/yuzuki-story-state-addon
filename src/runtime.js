@@ -7,7 +7,7 @@ export const EXTENSION_KEY = 'yuzuki_story_state_addon';
 
 const DEFAULT_SETTINGS = Object.freeze({
   memorySync: true,
-  contentRevision: 1,
+  contentRevision: 2,
   promptOverrides: {},
   nativeStates: {},
 });
@@ -190,7 +190,7 @@ export class ContentAddonRuntime {
     this.settings = { ...DEFAULT_SETTINGS, ...(isPlainObject(stored) ? stored : {}) };
     this.settings.promptOverrides = isPlainObject(this.settings.promptOverrides) ? { ...this.settings.promptOverrides } : {};
     this.settings.nativeStates = isPlainObject(this.settings.nativeStates) ? this.settings.nativeStates : {};
-    this.settings.contentRevision = 1;
+    this.settings.contentRevision = 2;
     this.persistSettings();
     this.active = true;
     this.bindEvents();

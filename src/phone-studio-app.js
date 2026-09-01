@@ -1,10 +1,11 @@
 import { GENERATION_TOOLS, sanitizeGenerationError } from './generation-service.js';
 import { normalizeSocialState, renderToolState } from './studio-views.js';
 import { PhoneHomePager, YUZUKI_EXTENSION_APPS } from './phone-home-pager.js';
+import { readWechatBalance, setWechatBalance } from './wechat-wallet-adapter.js';
 
 const DEFAULT_TOOL_ID = GENERATION_TOOLS[0].id;
 const APP_BY_ID = new Map(YUZUKI_EXTENSION_APPS.map((app) => [app.id, app]));
-const APP_BY_TOOL_ID = new Map(YUZUKI_EXTENSION_APPS.map((app) => [app.toolId, app]));
+const APP_BY_TOOL_ID = new Map(YUZUKI_EXTENSION_APPS.filter((app) => app.toolId).map((app) => [app.toolId, app]));
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -42,7 +43,7 @@ export class StoryStudioPhoneApp {
       queueMicrotask(() => {
         const view = this.pendingView;
         this.pendingView = DEFAULT_TOOL_ID;
-        this.open(view === 'prompt-settings' ? view : app.toolId);
+        this.open(view === 'prompt-settings' ? view : (app.view || app.toolId));
       });
     }, { signal, capture: true });
     window.addEventListener('phone:panelVisibility', () => this.scheduleRegister(0, true), { signal });
@@ -101,6 +102,7 @@ export class StoryStudioPhoneApp {
       this.registerDesktop();
       if (!this.getShell()?.setContent) return;
       if (view === 'prompt-settings') this.renderPromptSettings(this.promptToolId);
+      else if (view === 'wechat-wallet') this.renderWechatWallet();
       else {
         const appToolId = APP_BY_ID.get(view)?.toolId;
         this.renderTool(toolById(appToolId || view)?.id || this.currentToolId || DEFAULT_TOOL_ID);
@@ -143,12 +145,54 @@ export class StoryStudioPhoneApp {
       || document.querySelector('.yssa-phone-app');
   }
 
-  header(title, { promptSettings = false } = {}) {
+  header(title, { promptSettings = false, utility = true } = {}) {
     return `<header class="yssa-native-header">
       <div class="yssa-native-header-left"><button type="button" class="yssa-native-header-button" data-yssa-action="${promptSettings ? 'back-tool' : 'phone-home'}" aria-label="${promptSettings ? '返回当前 App' : '返回柚月桌面'}"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button></div>
       <div class="yssa-native-header-title"><strong>${escapeHtml(title)}</strong><span class="yssa-connection-dot" data-yssa-connection aria-label="连接状态"></span></div>
-      <div class="yssa-native-header-right">${promptSettings ? '' : '<button type="button" class="yssa-native-header-button" data-yssa-action="refresh-memory" aria-label="刷新记忆"><i class="fa-solid fa-rotate" aria-hidden="true"></i></button><button type="button" class="yssa-native-header-button" data-yssa-action="settings" aria-label="提示词设置"><i class="fa-solid fa-gear" aria-hidden="true"></i></button>'}</div>
+      <div class="yssa-native-header-right">${promptSettings || !utility ? '' : '<button type="button" class="yssa-native-header-button" data-yssa-action="refresh-memory" aria-label="刷新记忆"><i class="fa-solid fa-rotate" aria-hidden="true"></i></button><button type="button" class="yssa-native-header-button" data-yssa-action="settings" aria-label="提示词设置"><i class="fa-solid fa-gear" aria-hidden="true"></i></button>'}</div>
     </header>`;
+  }
+
+  renderWechatWallet() {
+    const root = this.setContent(`<main class="yssa-phone-app yssa-native-app yssa-wallet-page">
+      ${this.header('微信余额', { utility: false })}
+      <div class="yssa-tool-scroll"><section class="yssa-wallet-hero"><small>WECHAT WALLET</small><p>零钱余额</p><strong data-yssa-wallet-balance>¥ --</strong><span data-yssa-wallet-version>正在连接柚月微信…</span></section><section class="yssa-wallet-editor"><label for="yssa-wallet-amount">修改为</label><div><span>¥</span><input id="yssa-wallet-amount" data-yssa-wallet-input type="number" inputmode="decimal" min="0" max="999999999.99" step="0.01" placeholder="0.00"></div><p>直接修改柚月微信实际使用的默认零钱余额。不会清空聊天、红包或转账流水，也不会生成一笔虚假的收支记录。</p><button type="button" data-yssa-action="save-wallet">保存余额</button><output data-yssa-wallet-feedback></output></section></div>
+    </main>`, 'yssa-wechat-wallet');
+    if (!root) return;
+    this.bindCommon(root);
+    this.updateConnectionBadge(root);
+    const input = root.querySelector('[data-yssa-wallet-input]');
+    const balance = root.querySelector('[data-yssa-wallet-balance]');
+    const version = root.querySelector('[data-yssa-wallet-version]');
+    const feedback = root.querySelector('[data-yssa-wallet-feedback]');
+    const save = root.querySelector('[data-yssa-action="save-wallet"]');
+    const load = async () => {
+      try {
+        const state = await readWechatBalance();
+        balance.textContent = `¥ ${state.balance.toFixed(2)}`;
+        input.value = state.balance.toFixed(2);
+        version.textContent = `柚月手机 ${state.phoneVersion}${state.initialized ? ' · 已连接真实钱包' : ' · 钱包尚未初始化'}`;
+      } catch (error) {
+        version.textContent = error.message;
+        feedback.textContent = '请先打开一次柚月微信，再回到这里重试。';
+      }
+    };
+    save?.addEventListener('click', async () => {
+      save.disabled = true;
+      feedback.textContent = '正在保存…';
+      try {
+        const value = await setWechatBalance(input.value);
+        balance.textContent = `¥ ${value.toFixed(2)}`;
+        input.value = value.toFixed(2);
+        feedback.textContent = '已写入柚月微信真实零钱余额。';
+        this.getShell()?.showNotification?.('微信余额', `零钱已修改为 ¥${value.toFixed(2)}`, '✅');
+      } catch (error) {
+        feedback.textContent = error.message;
+      } finally {
+        save.disabled = false;
+      }
+    });
+    load();
   }
 
   renderTool(toolId) {

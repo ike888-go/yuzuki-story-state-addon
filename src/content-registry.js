@@ -1,5 +1,5 @@
 export const CONTENT_TYPE = 'yuzuki_native_story_app';
-export const CONTENT_VERSION = 1;
+export const CONTENT_VERSION = 2;
 
 const CONTENT_URL = new URL('../packs/yuzuki-native-app-content.json', import.meta.url);
 
@@ -26,6 +26,7 @@ export function validateContentRegistry(input) {
     if (!id || !key || !String(item.name || '').trim()) throw new Error(`第 ${index + 1} 个栏目缺少 id、key 或 name。`);
     if (ids.has(id) || keys.has(key)) throw new Error(`栏目标识重复：${id || key}`);
     if (!isPlainObject(item.initialState)) throw new Error(`栏目 ${id} 的 initialState 必须是对象。`);
+    if (!isPlainObject(item.outputContract)) throw new Error(`栏目 ${id} 的 outputContract 必须是对象。`);
     if (!String(item.promptTemplate || '').trim()) throw new Error(`栏目 ${id} 缺少生成提示词。`);
     ids.add(id);
     keys.add(key);

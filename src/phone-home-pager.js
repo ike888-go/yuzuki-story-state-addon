@@ -10,6 +10,7 @@ export const YUZUKI_EXTENSION_APPS = Object.freeze([
   Object.freeze({ id: 'yssa-investigation', toolId: 'yssa_investigation_report', name: '大调查', icon: '查', color: '#9c4c51', defaultIcon: iconSvg({ from: '#b4666b', to: '#6d343d', glyph: '查' }) }),
   Object.freeze({ id: 'yssa-achievements', toolId: 'yssa_achievement_book', name: '成就册', icon: '成', color: '#a57b32', defaultIcon: iconSvg({ from: '#d7ad58', to: '#7a5922', glyph: '成' }) }),
   Object.freeze({ id: 'yssa-social', toolId: 'yssa_social_notes', name: '小红书', icon: '记', color: '#ff2442', defaultIcon: iconSvg({ from: '#ff5a70', to: '#e81738', glyph: '记' }) }),
+  Object.freeze({ id: 'yssa-wechat-wallet', view: 'wechat-wallet', name: '微信余额', icon: '¥', color: '#07c160', defaultIcon: iconSvg({ from: '#24cf76', to: '#059b4c', glyph: '¥' }) }),
 ]);
 
 export function paginateExtensionApps(apps, pageSize = EXTENSION_PAGE_SIZE) {

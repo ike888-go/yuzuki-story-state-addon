@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { paginateExtensionApps, YUZUKI_EXTENSION_APPS } from '../src/phone-home-pager.js';
 
-test('places the four features on the first extension desktop page', () => {
-  assert.deepEqual(YUZUKI_EXTENSION_APPS.map((app) => app.name), ['剧情状态', '大调查', '成就册', '小红书']);
-  assert.equal(new Set(YUZUKI_EXTENSION_APPS.map((app) => app.id)).size, 4);
+test('places the content apps and WeChat wallet tool on the first extension desktop page', () => {
+  assert.deepEqual(YUZUKI_EXTENSION_APPS.map((app) => app.name), ['剧情状态', '大调查', '成就册', '小红书', '微信余额']);
+  assert.equal(new Set(YUZUKI_EXTENSION_APPS.map((app) => app.id)).size, 5);
   assert.equal(paginateExtensionApps(YUZUKI_EXTENSION_APPS).length, 1);
 });
 

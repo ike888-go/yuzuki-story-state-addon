@@ -34,6 +34,13 @@
       "fallback": null
     },
     {
+      "id": "yuzuki-phone-wechat-wallet",
+      "owner": "provider",
+      "symbol": "window.VirtualPhone.cachedWechatData.getWalletBalance/setWalletBalance",
+      "required": false,
+      "fallback": "通过柚月手机 extensionBaseUrl 按需加载同版本 WechatData；不可用时仅禁用余额工具。"
+    },
+    {
       "id": "yuzuki-memory-runtime",
       "owner": "provider",
       "symbol": "window.YuzukiMemory",

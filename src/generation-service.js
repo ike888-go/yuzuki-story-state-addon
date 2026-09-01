@@ -212,23 +212,29 @@ export function buildGenerationMessages({
   const tool = TOOL_BY_ID.get(item?.id);
   if (!tool) throw new Error('不支持这个生成项目。');
   const targetLine = tool.needsTarget ? `\n指定调查对象：${text(target, 160)}` : '';
-  const schema = JSON.stringify(item.initialState || item.state || {});
+  const contract = JSON.stringify(item.outputContract || item.initialState || item.state || {});
   const prompt = text(promptOverride || item.promptTemplate, 32000);
   if (!prompt) throw new Error('这个栏目没有生成提示词。');
   const extra = text(extraInstructions, 4000);
+  const currentState = isPlainObject(item?.state)
+    ? `\n【当前 App 已保存数据】\n${JSON.stringify(item.state)}\n它是连续性基线，不是事实来源。请依据本次材料校正并返回完整 JSON；没有变化的稳定字段应保留。`
+    : '';
   const baseline = continueFromCurrent && isPlainObject(item?.state)
-    ? `\n【当前档案基线】\n${JSON.stringify(item.state)}\n请根据新剧情更新这份基线，仍返回包含全部字段的完整 JSON。未变化字段保留原值。`
+    ? '\n【续查模式】\n本轮是在现有档案上继续调查。先解决新材料与旧档案的冲突，再补充新增信息；不得把未变化字段清空。'
     : '';
 
   return [
     {
       role: 'system',
       content: [
-        '你是柚月剧情工坊的数据整理与应用内容生成助手。',
-        '只依据给出的角色设定、记忆和最近剧情工作；未知内容必须明确写未知，不得伪造事实。',
+        '你是柚月手机原生扩展 App 的结构化内容生成器，只更新 App 数据，不续写剧情，也不替角色回复用户。',
+        '证据优先级：最近剧情中的明确事实 > 柚月记忆中的稳定事实 > 角色与场景设定 > 当前 App 旧数据。发生冲突时采用更近、更明确的材料。',
+        '必须区分三类内容：已发生事实、基于人物设定的合理推定、供用户选择的玩法建议。不得把建议写成已发生事实，也不得把传闻写成确定事实。',
+        '旧数据只用于延续 ID、累计记录和未变化字段；若旧数据与新证据冲突，必须修正旧数据。',
         '最终只返回一个 JSON 对象，不要 Markdown、代码围栏、解释、标签或额外文字。',
-        '数组必须保持为数组，对象必须保持为对象，不得把结构化内容改写成带换行的长字符串。',
-        `允许的完整数据结构以这个对象为准：${schema}`,
+        '必须输出契约中的全部键；数组必须保持为数组，对象必须保持为对象，数字和布尔值不得改成字符串。',
+        '输出契约中的示例值只说明类型和数组元素结构，绝不能照抄为结果，也不能新增同义字段。',
+        `【完整输出契约】${contract}`,
       ].join('\n'),
     },
     {
@@ -236,6 +242,7 @@ export function buildGenerationMessages({
       content: [
         `任务：${prompt}${targetLine}`,
         extra ? `\n【本次额外要求】\n${extra}` : '',
+        currentState,
         baseline,
         `\n【角色与场景】\n${buildCharacterContext(context)}`,
         `\n【柚月记忆快照】\n${buildMemoryContext(memorySnapshot)}`,
